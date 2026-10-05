@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "78b57eaa-4c41-4b24-b47d-9a67bbb7b366",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\architecture-nova-containers-20261005-004817\\candidate.json",
+  "output": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\architecture-nova-containers-20261005-004817\\nova-containers.html",
+  "specification": {
+    "sha256": "81e316f103b996e12dceea29e3b85c31613be610d28510b9e7cda10e7f1103ae",
+    "bytes": 6837
+  },
+  "artifact": {
+    "sha256": "dbc902767786e2cfd2fc5e04646dc3f5c9461239f74a63292d13a7bfbb369140",
+    "bytes": 788296
+  }
+}

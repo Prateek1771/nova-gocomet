@@ -1,0 +1,500 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Nova at 1M Users — Cell-Based Architecture",
+    "output": ".archify/architecture-nova-cells-1m-20261005-004753/nova-cells-1m.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    {
+      "id": "identity",
+      "type": "security",
+      "label": "Identity / SSO",
+      "sublabel": "OIDC · SAML",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "directory",
+      "type": "cloud",
+      "label": "Tenant Directory",
+      "sublabel": "tenant → cell, region",
+      "pos": [
+        240,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "registry",
+      "type": "backend",
+      "label": "Definition Registry",
+      "sublabel": "DSL · agent specs · apps",
+      "pos": [
+        925,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "billing",
+      "type": "backend",
+      "label": "Usage + Billing",
+      "sublabel": "LiteLLM spend rollup",
+      "pos": [
+        1240,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "users",
+      "type": "external",
+      "label": "Enterprise Users",
+      "sublabel": "ops · finance · FDE",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "cloud",
+      "label": "Global Edge Router",
+      "sublabel": "JWT tenant claim",
+      "pos": [
+        240,
+        220
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "nova-api",
+      "sublabel": "FastAPI · HPA",
+      "pos": [
+        640,
+        220
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "workers",
+      "type": "backend",
+      "label": "Worker Pools",
+      "sublabel": "per task queue · KEDA",
+      "pos": [
+        900,
+        220
+      ],
+      "size": [
+        200,
+        100
+      ],
+      "tag": "engine · extract · reason · decide"
+    },
+    {
+      "id": "litellm",
+      "type": "cloud",
+      "label": "LiteLLM Gateway",
+      "sublabel": "aliases · budgets",
+      "pos": [
+        1240,
+        220
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "openrouter",
+      "type": "external",
+      "label": "OpenRouter",
+      "sublabel": "frontier + Jev",
+      "pos": [
+        1560,
+        220
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "in1",
+      "type": "cloud",
+      "label": "Cell IN-1",
+      "sublabel": "same stack",
+      "pos": [
+        225,
+        400
+      ],
+      "size": [
+        110,
+        64
+      ]
+    },
+    {
+      "id": "usd",
+      "type": "cloud",
+      "label": "Cell US-dedicated",
+      "sublabel": "large tenant",
+      "pos": [
+        350,
+        400
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "openfga",
+      "type": "security",
+      "label": "OpenFGA",
+      "sublabel": "check cache",
+      "pos": [
+        490,
+        400
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "RLS · 90-day hot",
+      "pos": [
+        640,
+        400
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "temporal",
+      "type": "database",
+      "label": "Temporal",
+      "sublabel": "cell namespace",
+      "pos": [
+        875,
+        400
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "weaviate",
+      "type": "database",
+      "label": "Weaviate",
+      "sublabel": "SOPs · tenants",
+      "pos": [
+        1005,
+        400
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "vllm",
+      "type": "backend",
+      "label": "vLLM GPU Pool",
+      "sublabel": "regional VLM",
+      "pos": [
+        1240,
+        400
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka",
+      "sublabel": "events · CDC · outbox",
+      "pos": [
+        640,
+        560
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "clickhouse",
+      "type": "database",
+      "label": "ClickHouse",
+      "sublabel": "regional cluster",
+      "pos": [
+        900,
+        560
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "push",
+      "type": "backend",
+      "label": "Push Gateway",
+      "sublabel": "SSE · 10K conn/node",
+      "pos": [
+        640,
+        720
+      ],
+      "size": [
+        140,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Global control plane",
+      "wraps": [
+        "identity",
+        "directory",
+        "registry",
+        "billing"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Region EU · Cell EU-1 (complete Nova stack)",
+      "wraps": [
+        "api",
+        "workers",
+        "litellm",
+        "openfga",
+        "postgres",
+        "temporal",
+        "weaviate",
+        "vllm",
+        "kafka",
+        "clickhouse",
+        "push"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "users-edge",
+      "from": "users",
+      "to": "edge",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "users-sso",
+      "from": "users",
+      "to": "identity",
+      "label": "SSO login",
+      "variant": "security"
+    },
+    {
+      "id": "edge-directory",
+      "from": "edge",
+      "to": "directory",
+      "label": "lookup cell"
+    },
+    {
+      "id": "edge-api",
+      "from": "edge",
+      "to": "api",
+      "label": "route by tenant claim",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge-in1",
+      "from": "edge",
+      "to": "in1",
+      "label": "IN tenants",
+      "variant": "dashed"
+    },
+    {
+      "id": "edge-usd",
+      "from": "edge",
+      "to": "usd",
+      "label": "dedicated",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-fga",
+      "from": "api",
+      "to": "openfga",
+      "label": "authz check",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "top"
+    },
+    {
+      "id": "api-pg",
+      "from": "api",
+      "to": "postgres",
+      "label": "SQL"
+    },
+    {
+      "id": "api-workers",
+      "from": "api",
+      "to": "workers",
+      "label": "start / signal"
+    },
+    {
+      "id": "workers-temporal",
+      "from": "workers",
+      "to": "temporal",
+      "label": "poll",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "workers-weaviate",
+      "from": "workers",
+      "to": "weaviate",
+      "label": "SOP search",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "workers-litellm",
+      "from": "workers",
+      "to": "litellm",
+      "label": "nova-* aliases"
+    },
+    {
+      "id": "litellm-vllm",
+      "from": "litellm",
+      "to": "vllm",
+      "label": "nova-extract"
+    },
+    {
+      "id": "litellm-openrouter",
+      "from": "litellm",
+      "to": "openrouter",
+      "label": "fallback / burst",
+      "variant": "dashed"
+    },
+    {
+      "id": "litellm-billing",
+      "from": "litellm",
+      "to": "billing",
+      "label": "spend",
+      "variant": "dashed"
+    },
+    {
+      "id": "registry-workers",
+      "from": "registry",
+      "to": "workers",
+      "label": "sync definitions",
+      "variant": "dashed"
+    },
+    {
+      "id": "pg-kafka",
+      "from": "postgres",
+      "to": "kafka",
+      "label": "Debezium CDC"
+    },
+    {
+      "id": "kafka-ch",
+      "from": "kafka",
+      "to": "clickhouse",
+      "label": "Kafka engine"
+    },
+    {
+      "id": "kafka-push",
+      "from": "kafka",
+      "to": "push",
+      "label": "run events"
+    },
+    {
+      "id": "push-users",
+      "from": "push",
+      "to": "users",
+      "label": "SSE live updates",
+      "fromSide": "left",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Global control plane",
+      "items": [
+        "Tenant directory maps each tenant to a cell and region",
+        "Definition registry syncs DSL versions, agent specs and app defs to every cell",
+        "Billing rolls up LiteLLM spend per tenant"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Cell anatomy",
+      "items": [
+        "One cell serves ~50–100K users; 10–20 cells at 1M",
+        "Worker pools scale per Temporal task queue via KEDA",
+        "Agents query ClickHouse metrics through the dbt semantic layer",
+        "IN-1 and US-dedicated run the identical stack"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Inference economics",
+      "items": [
+        "nova-extract points at a regional vLLM pool",
+        "OpenRouter stays as fallback and burst capacity",
+        "Target < $0.01 per document blended"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Isolation",
+      "items": [
+        "Cells bound blast radius and meet EU / India / US residency",
+        "Largest tenants (> 20% of a cell) get a dedicated cell",
+        "Tenant move = Temporal drain + logical replication"
+      ]
+    }
+  ]
+}

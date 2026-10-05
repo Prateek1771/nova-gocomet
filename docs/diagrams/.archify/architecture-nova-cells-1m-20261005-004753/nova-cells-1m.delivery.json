@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "5b0243f7-6a45-4965-955a-1c49bfc7ea7f",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\architecture-nova-cells-1m-20261005-004753\\candidate.json",
+  "output": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\architecture-nova-cells-1m-20261005-004753\\nova-cells-1m.html",
+  "specification": {
+    "sha256": "1663d9331e904d0032fb5f3a55ebcc0e4f382e957c1cbc19eae8f3350404e4e7",
+    "bytes": 9424
+  },
+  "artifact": {
+    "sha256": "e0a794a3a67cd7f69e8d27eac07321bd241e4ba8fa8100c86ad5932746f21ff0",
+    "bytes": 789522
+  }
+}

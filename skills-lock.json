@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "senior-architect": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/senior-architect/SKILL.md",
+      "computedHash": "2b463626bf730b21872768447388c18a4387a7a307e00013b696c0f15e5659e3"
+    }
+  }
+}

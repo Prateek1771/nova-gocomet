@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\candidate.json",
+    "sha256": "4c948b4b2dbaf77a41912d841082688c16c0d401c7f7650e7137e37c2773a91b",
+    "bytes": 6531
+  },
+  "artifact": {
+    "path": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\bol-intake.html",
+    "sha256": "49aa672c48b73ca80baee69151b4f06c8791557dd6937ac3f987c4e8c69e0a23",
+    "bytes": 766418
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\bol-intake.finalize.json",
+    "summaryReceipt": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\bol-intake.finalize-summary.json",
+    "browserCheckReceipt": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\bol-intake.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-04T19:17:01.574Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3265
+}

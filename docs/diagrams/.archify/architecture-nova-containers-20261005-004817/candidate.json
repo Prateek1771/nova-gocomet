@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Nova Prototype — Container Architecture",
+    "output": ".archify/architecture-nova-containers-20261005-004817/nova-containers.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "Ops / Approver", "sublabel": "browser", "pos": [40, 220], "size": [150, 62] },
+    { "id": "web", "type": "frontend", "label": "Nova Web", "sublabel": "React + React Flow", "pos": [250, 220], "size": [150, 62] },
+    { "id": "api", "type": "backend", "label": "nova-api", "sublabel": "FastAPI · REST + SSE", "pos": [480, 220], "size": [150, 62] },
+    { "id": "temporal", "type": "messagebus", "label": "Temporal", "sublabel": "durable runs", "pos": [730, 220], "size": [150, 62] },
+    { "id": "engine", "type": "backend", "label": "engine-worker", "sublabel": "generic DSL interpreter", "pos": [980, 220], "size": [150, 62] },
+    { "id": "litellm", "type": "cloud", "label": "LiteLLM", "sublabel": "aliases · budgets", "pos": [1250, 220], "size": [150, 62] },
+    { "id": "openrouter", "type": "external", "label": "OpenRouter", "sublabel": "Claude · Jev", "pos": [1250, 60], "size": [150, 62] },
+    { "id": "fga", "type": "security", "label": "OpenFGA", "sublabel": "ReBAC + limits", "pos": [480, 60], "size": [150, 62] },
+    { "id": "agents", "type": "backend", "label": "agents-worker", "sublabel": "LangGraph · 5 stages", "pos": [730, 380], "size": [150, 62] },
+    { "id": "postgres", "type": "database", "label": "Postgres", "sublabel": "system of record · RLS", "pos": [480, 380], "size": [150, 62] },
+    { "id": "minio", "type": "database", "label": "MinIO", "sublabel": "documents", "pos": [250, 380], "size": [150, 62] },
+    { "id": "langfuse", "type": "cloud", "label": "Langfuse", "sublabel": "LLM traces · cost", "pos": [1250, 380], "size": [150, 62] },
+    { "id": "weaviate", "type": "database", "label": "Weaviate", "sublabel": "SOPs · clauses", "pos": [730, 540], "size": [150, 62] },
+    { "id": "debezium", "type": "messagebus", "label": "Debezium", "sublabel": "Kafka Connect CDC", "pos": [480, 540], "size": [150, 62] },
+    { "id": "clickhouse", "type": "database", "label": "ClickHouse", "sublabel": "events · facts", "pos": [980, 540], "size": [150, 62] },
+    { "id": "kafka", "type": "messagebus", "label": "Kafka", "sublabel": "KRaft", "pos": [480, 700], "size": [150, 62] },
+    { "id": "ingest", "type": "backend", "label": "ingest", "sublabel": "simulator · trigger router", "pos": [40, 700], "size": [150, 62] },
+    { "id": "dbt", "type": "backend", "label": "dbt", "sublabel": "semantic metrics", "pos": [980, 700], "size": [150, 62] },
+    { "id": "redis", "type": "database", "label": "Redis", "sublabel": "Langfuse queue", "pos": [1250, 700], "size": [150, 62] }
+  ],
+  "connections": [
+    { "id": "user-web", "from": "user", "to": "web", "label": "uses", "variant": "emphasis" },
+    { "id": "web-api", "from": "web", "to": "api", "label": "REST/SSE", "variant": "emphasis" },
+    { "id": "api-temporal", "from": "api", "to": "temporal", "label": "start/signal", "variant": "emphasis" },
+    { "id": "temporal-engine", "from": "temporal", "to": "engine", "label": "engine queue", "variant": "emphasis" },
+    { "id": "engine-litellm", "from": "engine", "to": "litellm", "label": "decide · Jev", "variant": "emphasis" },
+    { "id": "litellm-openrouter", "from": "litellm", "to": "openrouter", "label": "HTTPS", "fromSide": "top", "toSide": "bottom" },
+    { "id": "api-fga", "from": "api", "to": "fga", "label": "check", "variant": "security", "fromSide": "top", "toSide": "bottom" },
+    { "id": "api-postgres", "from": "api", "to": "postgres", "label": "SQL · RLS", "fromSide": "bottom", "toSide": "top" },
+    { "id": "api-minio", "from": "api", "to": "minio", "label": "upload", "fromSide": "bottom", "toSide": "top" },
+    { "id": "temporal-agents", "from": "temporal", "to": "agents", "label": "agents queue", "fromSide": "bottom", "toSide": "top" },
+    { "id": "agents-postgres", "from": "agents", "to": "postgres", "label": "evidence", "fromSide": "left", "toSide": "right" },
+    { "id": "agents-litellm", "from": "agents", "to": "litellm", "label": "extract · reason", "fromSide": "right", "toSide": "left" },
+    { "id": "agents-weaviate", "from": "agents", "to": "weaviate", "label": "SOP search", "fromSide": "bottom", "toSide": "top" },
+    { "id": "agents-clickhouse", "from": "agents", "to": "clickhouse", "label": "metric SQL", "fromSide": "bottom", "toSide": "top" },
+    { "id": "litellm-langfuse", "from": "litellm", "to": "langfuse", "label": "traces", "fromSide": "bottom", "toSide": "top" },
+    { "id": "langfuse-clickhouse", "from": "langfuse", "to": "clickhouse", "label": "store", "variant": "dashed", "fromSide": "bottom", "toSide": "right" },
+    { "id": "langfuse-redis", "from": "langfuse", "to": "redis", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "postgres-debezium", "from": "postgres", "to": "debezium", "label": "WAL", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "debezium-kafka", "from": "debezium", "to": "kafka", "label": "cdc.* topics", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "kafka-clickhouse", "from": "kafka", "to": "clickhouse", "label": "Kafka engine", "variant": "dashed", "fromSide": "right", "toSide": "left" },
+    { "id": "dbt-clickhouse", "from": "dbt", "to": "clickhouse", "label": "models", "fromSide": "top", "toSide": "bottom" },
+    { "id": "ingest-kafka", "from": "ingest", "to": "kafka", "label": "events · CDC triggers", "variant": "dashed" },
+    { "id": "ingest-temporal", "from": "ingest", "to": "temporal", "label": "start workflow", "variant": "dashed", "fromSide": "left", "toSide": "top", "via": [[16, 731], [16, 30], [805, 30]] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Runtime", "items": ["One generic NovaWorkflow interprets every YAML definition", "Agents run as Temporal activities; engine owns control flow", "Engine writes run projections to Postgres and checks OpenFGA for assignees"] },
+    { "dot": "violet", "title": "LLM governance", "items": ["Code names only aliases: nova-extract, nova-reason, nova-decide", "Jev (typesafe/jev-1.13) answers decide nodes, small model as fallback", "Per-tenant virtual keys and budgets in LiteLLM"] },
+    { "dot": "rose", "title": "Tenant isolation", "items": ["Postgres RLS, ClickHouse row policies", "Weaviate tenants, MinIO prefixes, OpenFGA relations"] },
+    { "dot": "amber", "title": "Compose profiles (16 GB)", "items": ["core ~4 GB: api, workers, Temporal, Postgres, MinIO, OpenFGA, LiteLLM", "data ~3.5 GB: Kafka, Debezium, ClickHouse, ingest, dbt", "ai ~2.8 GB: Langfuse, Weaviate, OTel"] }
+  ]
+}

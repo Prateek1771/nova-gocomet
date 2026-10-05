@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Nova Shipment Exception Monitoring",
+    "output": ".archify/dataflow-exception-monitoring-20261005-004704/exception-monitoring.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      690
+    ]
+  },
+  "stages": [
+    {
+      "label": "Ingest / Trigger"
+    },
+    {
+      "label": "Transport / Analyse"
+    },
+    {
+      "label": "Store / Decide"
+    },
+    {
+      "label": "Model / Recommend"
+    },
+    {
+      "label": "Detect / Review"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sim",
+      "type": "external",
+      "label": "Event Simulator",
+      "sublabel": "carrier / port feed",
+      "stage": 0,
+      "row": 0,
+      "tag": "50 shipments"
+    },
+    {
+      "id": "events",
+      "type": "messagebus",
+      "label": "shipment.events",
+      "sublabel": "Kafka topic",
+      "stage": 1,
+      "row": 0,
+      "tag": "key tenant:shipment"
+    },
+    {
+      "id": "ch",
+      "type": "database",
+      "label": "ClickHouse",
+      "sublabel": "Kafka engine + MV",
+      "stage": 2,
+      "row": 0,
+      "tag": "shipment_events"
+    },
+    {
+      "id": "dbt",
+      "type": "backend",
+      "label": "dbt Metrics",
+      "sublabel": "eta_slip, dwell",
+      "stage": 3,
+      "row": 0,
+      "tag": "semantic layer"
+    },
+    {
+      "id": "detect",
+      "type": "backend",
+      "label": "Detection",
+      "sublabel": "Temporal schedule 5m",
+      "stage": 4,
+      "row": 0,
+      "tag": "tenant thresholds"
+    },
+    {
+      "id": "exc",
+      "type": "database",
+      "label": "exceptions",
+      "sublabel": "Postgres, RLS",
+      "stage": 4,
+      "row": 1,
+      "tag": "1 open per type"
+    },
+    {
+      "id": "dbz",
+      "type": "backend",
+      "label": "Debezium",
+      "sublabel": "Postgres WAL CDC",
+      "stage": 3,
+      "row": 1,
+      "tag": "Kafka Connect"
+    },
+    {
+      "id": "cdc",
+      "type": "messagebus",
+      "label": "cdc.exceptions",
+      "sublabel": "Kafka topic",
+      "stage": 2,
+      "row": 1,
+      "tag": "change events"
+    },
+    {
+      "id": "router",
+      "type": "backend",
+      "label": "Trigger Router",
+      "sublabel": "ingest service",
+      "stage": 1,
+      "row": 1,
+      "tag": "idempotent"
+    },
+    {
+      "id": "sops",
+      "type": "database",
+      "label": "Weaviate SOPs",
+      "sublabel": "tenant-scoped",
+      "stage": 3,
+      "row": 2,
+      "tag": "playbooks"
+    },
+    {
+      "id": "run",
+      "type": "cloud",
+      "label": "exception_triage",
+      "sublabel": "Temporal run",
+      "stage": 0,
+      "row": 2,
+      "tag": "NovaWorkflow"
+    },
+    {
+      "id": "analyst",
+      "type": "backend",
+      "label": "exception_analyst",
+      "sublabel": "LangGraph agent",
+      "stage": 1,
+      "row": 3,
+      "tag": "SQL evidence"
+    },
+    {
+      "id": "jev",
+      "type": "security",
+      "label": "Jev decide",
+      "sublabel": "actionable? impact?",
+      "stage": 2,
+      "row": 3,
+      "tag": "nova-decide"
+    },
+    {
+      "id": "rec",
+      "type": "backend",
+      "label": "action_recommender",
+      "sublabel": "LangGraph agent",
+      "stage": 3,
+      "row": 3,
+      "tag": "cites SOP"
+    },
+    {
+      "id": "task",
+      "type": "frontend",
+      "label": "Ops Lead Task",
+      "sublabel": "ExceptionPanel",
+      "stage": 4,
+      "row": 3,
+      "tag": "SLA 1h"
+    },
+    {
+      "id": "notify",
+      "type": "external",
+      "label": "Notify Customer",
+      "sublabel": "outbox action",
+      "stage": 4,
+      "row": 2,
+      "tag": "mock sink"
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-emit",
+      "from": "sim",
+      "to": "events",
+      "label": "milestones + ETA",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-ingest",
+      "from": "events",
+      "to": "ch",
+      "label": "JSONEachRow",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-model",
+      "from": "ch",
+      "to": "dbt",
+      "label": "models",
+      "variant": "dashed"
+    },
+    {
+      "id": "f-metric",
+      "from": "dbt",
+      "to": "detect",
+      "label": "metric query",
+      "variant": "default"
+    },
+    {
+      "id": "f-insert",
+      "from": "detect",
+      "to": "exc",
+      "label": "upsert exception",
+      "classification": "dedupe",
+      "variant": "emphasis",
+      "labelAt": [
+        960,
+        214
+      ]
+    },
+    {
+      "id": "f-wal",
+      "from": "exc",
+      "to": "dbz",
+      "label": "WAL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-cdc",
+      "from": "dbz",
+      "to": "cdc",
+      "label": "change event",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-route",
+      "from": "cdc",
+      "to": "router",
+      "label": "consume",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-start",
+      "from": "router",
+      "to": "run",
+      "label": "StartWorkflow",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-analyze",
+      "from": "run",
+      "to": "analyst",
+      "label": "activity",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-facts",
+      "from": "analyst",
+      "to": "jev",
+      "label": "facts",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-actionable",
+      "from": "jev",
+      "to": "rec",
+      "label": "actionable",
+      "classification": "else auto-close",
+      "variant": "security"
+    },
+    {
+      "id": "f-sop",
+      "from": "sops",
+      "to": "rec",
+      "label": "SOP chunks",
+      "variant": "dashed",
+      "labelAt": [
+        745,
+        442
+      ]
+    },
+    {
+      "id": "f-review",
+      "from": "rec",
+      "to": "task",
+      "label": "recommendation",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-notify",
+      "from": "task",
+      "to": "notify",
+      "label": "accept / override",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Main path",
+      "items": [
+        "Events land in ClickHouse via Kafka engine + materialised view",
+        "A Temporal schedule queries dbt metrics against tenant thresholds",
+        "Detected exceptions are business records in Postgres, deduped per shipment + type"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Generic trigger",
+      "items": [
+        "Debezium streams the exceptions table to Kafka",
+        "The trigger router starts exception_triage from any CDC topic",
+        "No exception-specific code in the engine"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Gates",
+      "items": [
+        "Jev answers actionable + customer-impacting; not actionable auto-closes with a note",
+        "Ops lead accepts, overrides, or dismisses before any customer notification",
+        "Analyst queries run read-only under the ClickHouse tenant row policy"
+      ]
+    }
+  ]
+}

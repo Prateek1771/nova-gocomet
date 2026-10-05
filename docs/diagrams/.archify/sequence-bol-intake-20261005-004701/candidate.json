@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Nova \u00c2\u00b7 Bill of Lading Intake Sequence",
+    "output": ".archify/sequence-bol-intake-20261005-004701/bol-intake.html",
+    "viewBox": [
+      1080,
+      694
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "ops",
+      "type": "external",
+      "label": "Ops exec",
+      "sublabel": "uploader + reviewer"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Nova Web",
+      "sublabel": "React + inbox"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "nova-api",
+      "sublabel": "FastAPI + SSE"
+    },
+    {
+      "id": "temporal",
+      "type": "cloud",
+      "label": "Temporal",
+      "sublabel": "durable runs"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "engine-worker",
+      "sublabel": "DSL interpreter"
+    },
+    {
+      "id": "agents",
+      "type": "backend",
+      "label": "agents-worker",
+      "sublabel": "LangGraph agents"
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LiteLLM",
+      "sublabel": "\u00e2\u2020\u2019 OpenRouter"
+    },
+    {
+      "id": "fga",
+      "type": "security",
+      "label": "OpenFGA",
+      "sublabel": "ReBAC authz"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 222,
+      "label": "Upload + start"
+    },
+    {
+      "from": 226,
+      "to": 334,
+      "label": "Agent steps"
+    },
+    {
+      "from": 338,
+      "to": 474,
+      "label": "Decide + assign"
+    },
+    {
+      "from": 478,
+      "to": 564,
+      "label": "Human review"
+    },
+    {
+      "from": 568,
+      "to": 596,
+      "label": "Resume"
+    }
+  ],
+  "messages": [
+    {
+      "id": "upload",
+      "from": "ops",
+      "to": "web",
+      "y": 165,
+      "label": "upload BoL.pdf",
+      "variant": "default"
+    },
+    {
+      "id": "post-doc",
+      "from": "web",
+      "to": "api",
+      "y": 193,
+      "label": "POST /documents",
+      "variant": "emphasis",
+      "note": "MinIO store, sha256 dedupe"
+    },
+    {
+      "id": "start",
+      "from": "api",
+      "to": "temporal",
+      "y": 221,
+      "label": "StartWorkflow bol_intake@v3",
+      "variant": "emphasis"
+    },
+    {
+      "id": "extract",
+      "from": "engine",
+      "to": "agents",
+      "y": 249,
+      "label": "activity doc_extractor",
+      "variant": "default"
+    },
+    {
+      "id": "vision",
+      "from": "agents",
+      "to": "llm",
+      "y": 277,
+      "label": "nova-extract (vision)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "extraction",
+      "from": "agents",
+      "to": "engine",
+      "y": 305,
+      "label": "fields + bboxes + confidence",
+      "variant": "return"
+    },
+    {
+      "id": "validate",
+      "from": "engine",
+      "to": "agents",
+      "y": 333,
+      "label": "bol_validator \u2192 issues[]",
+      "variant": "default"
+    },
+    {
+      "id": "decide",
+      "from": "engine",
+      "to": "llm",
+      "y": 361,
+      "label": "decide \u00b7 Jev: material?",
+      "variant": "emphasis"
+    },
+    {
+      "id": "resolve",
+      "from": "engine",
+      "to": "fga",
+      "y": 389,
+      "label": "resolve ops_exec assignees",
+      "variant": "security"
+    },
+    {
+      "id": "task",
+      "from": "engine",
+      "to": "api",
+      "y": 417,
+      "label": "create_human_task",
+      "variant": "default"
+    },
+    {
+      "id": "sse",
+      "from": "api",
+      "to": "web",
+      "y": 445,
+      "label": "SSE task.created",
+      "variant": "dashed"
+    },
+    {
+      "id": "approve",
+      "from": "ops",
+      "to": "web",
+      "y": 473,
+      "label": "review in DocumentViewer, approve",
+      "variant": "default"
+    },
+    {
+      "id": "complete",
+      "from": "web",
+      "to": "api",
+      "y": 501,
+      "label": "POST /tasks/{id}/complete",
+      "variant": "emphasis"
+    },
+    {
+      "id": "check",
+      "from": "api",
+      "to": "fga",
+      "y": 529,
+      "label": "check can_complete",
+      "variant": "security"
+    },
+    {
+      "id": "signal",
+      "from": "api",
+      "to": "temporal",
+      "y": 557,
+      "label": "Signal task_completed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "finish",
+      "from": "temporal",
+      "to": "engine",
+      "y": 585,
+      "label": "resume \u2192 tms.upsert_shipment \u2192 end",
+      "variant": "default"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "web",
+      "from": 160,
+      "to": 199,
+      "type": "frontend"
+    },
+    {
+      "participant": "api",
+      "from": 188,
+      "to": 227,
+      "type": "backend"
+    },
+    {
+      "participant": "engine",
+      "from": 244,
+      "to": 423,
+      "type": "backend"
+    },
+    {
+      "participant": "agents",
+      "from": 244,
+      "to": 339,
+      "type": "backend"
+    },
+    {
+      "participant": "llm",
+      "from": 272,
+      "to": 283,
+      "type": "external"
+    },
+    {
+      "participant": "llm",
+      "from": 356,
+      "to": 367,
+      "type": "external"
+    },
+    {
+      "participant": "fga",
+      "from": 384,
+      "to": 395,
+      "type": "security"
+    },
+    {
+      "participant": "api",
+      "from": 412,
+      "to": 451,
+      "type": "backend"
+    },
+    {
+      "participant": "web",
+      "from": 468,
+      "to": 507,
+      "type": "frontend"
+    },
+    {
+      "participant": "api",
+      "from": 496,
+      "to": 563,
+      "type": "backend"
+    },
+    {
+      "participant": "fga",
+      "from": 524,
+      "to": 535,
+      "type": "security"
+    },
+    {
+      "participant": "temporal",
+      "from": 552,
+      "to": 591,
+      "type": "cloud"
+    },
+    {
+      "participant": "engine",
+      "from": 580,
+      "to": 591,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Durable by default",
+      "items": [
+        "Every step runs as a Temporal activity of one generic NovaWorkflow",
+        "Human review waits on a signal; a worker crash replays, never duplicates"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Cheap brain, expensive brain",
+      "items": [
+        "Vision extraction uses the nova-extract alias",
+        "Routing questions go to Jev via nova-decide, with a fallback model"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Governed at both ends",
+      "items": [
+        "OpenFGA resolves who gets the task",
+        "OpenFGA re-checks can_complete before the signal is sent"
+      ]
+    }
+  ]
+}

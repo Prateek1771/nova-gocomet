@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "90e3cceb-e527-4ac3-bd1f-7dcad27fbea7",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\dataflow-exception-monitoring-20261005-004704\\candidate.json",
+  "output": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\dataflow-exception-monitoring-20261005-004704\\exception-monitoring.html",
+  "specification": {
+    "sha256": "15596d808cf9e1713dd45f21250bb71ac792dfe8e804b60a2d2095b10d7a3082",
+    "bytes": 6813
+  },
+  "artifact": {
+    "sha256": "e409d2a8f06464c0026802b2aabd56549825a895c3c54c7ddd369c0d27477af7",
+    "bytes": 774056
+  }
+}

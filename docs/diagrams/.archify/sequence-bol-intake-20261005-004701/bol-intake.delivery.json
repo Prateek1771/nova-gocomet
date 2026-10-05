@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "f8ea0fb2-bc66-4f29-8b37-7926a9a70f13",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\candidate.json",
+  "output": "D:\\personal\\nova_gocomet\\docs\\diagrams\\.archify\\sequence-bol-intake-20261005-004701\\bol-intake.html",
+  "specification": {
+    "sha256": "4c948b4b2dbaf77a41912d841082688c16c0d401c7f7650e7137e37c2773a91b",
+    "bytes": 6531
+  },
+  "artifact": {
+    "sha256": "49aa672c48b73ca80baee69151b4f06c8791557dd6937ac3f987c4e8c69e0a23",
+    "bytes": 766418
+  }
+}
