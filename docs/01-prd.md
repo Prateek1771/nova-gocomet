@@ -8,13 +8,15 @@ Nova's answer: **configurable workflows whose steps are governed agents**, with 
 
 ## 2. Personas
 
-| Persona | Goal | Touches |
-|---|---|---|
-| **Ops executive** (freight forwarder) | Clear my queue fast; trust what the agent pre-filled | Task Inbox, micro-apps |
-| **Ops lead / approver** | Approve only what needs me, with evidence in front of me | Inbox, exception dashboard |
-| **Finance controller** | No overpayments; disputes backed by evidence | Invoice workflow approvals |
-| **Process admin / FDE** | Model the client's process without engineering tickets | Workflow Studio, App Builder, agent config |
-| **Platform admin** | Tenants, roles, budgets, audit | Admin, Langfuse, LiteLLM UI |
+| Persona | Goal | Touches | Keycloak role(s) |
+|---|---|---|---|
+| **Ops executive** (freight forwarder) | Clear my queue fast; trust what the agent pre-filled | Task Inbox, micro-apps | `ops_exec` |
+| **Ops lead / approver** | Approve only what needs me, with evidence in front of me | Inbox, exception dashboard | `ops_lead` |
+| **Finance controller** | No overpayments; disputes backed by evidence | Invoice workflow approvals | `finance`, `controller` |
+| **Process admin / FDE** | Model the client's process without engineering tickets | Workflow Studio, App Builder, agent config | `process_designer` |
+| **Tenant admin** | Users, roles, config and budgets for my company | Admin, Keycloak org admin | `tenant_admin` |
+| **Auditor** | Read-only evidence and audit trail | Runs, audit log | `auditor` (`viewer` for other read-only staff) |
+| **Platform admin** (Nova staff) | Create and manage tenants; no access to tenant data | Admin, Langfuse, LiteLLM UI | `platform_admin` |
 
 ## 3. Scope — functional requirements
 
@@ -49,6 +51,8 @@ Nova's answer: **configurable workflows whose steps are governed agents**, with 
 - **FR-X.1** Audit log of every decision (human or agent) with actor, evidence, and definition version.
 - **FR-X.2** Two seeded tenants with different YAML for the same process.
 - **FR-X.3** One-command bring-up: `make up` (core) / `make up-full`.
+- **FR-X.4** Login via **Keycloak** (OIDC, auth code + PKCE), one Keycloak Organization per tenant; MFA required for `platform_admin`, `tenant_admin`, `finance`, `controller` outside dev; brute-force protection; logout ends the Keycloak session.
+- **FR-X.5** **RBAC:** the role → capability matrix ([LLD §7](03-lld.md#7-authorization-openfga)) is enforced server-side by OpenFGA on every request. The UI hides what a role can't do but never decides. Approval authority = role + amount limit from versioned TenantConfig.
 
 ## 4. Non-functional requirements (prototype targets)
 
@@ -60,12 +64,12 @@ Nova's answer: **configurable workflows whose steps are governed agents**, with 
 | Durability | Kill any worker mid-run → run resumes, no duplicate side effects |
 | Cost | < $0.05 per BoL end-to-end; visible per run |
 | Footprint | Full stack ≤ 11 GB RAM; + local LLMs ≤ 20 GB (32 GB machine, WSL cap 24 GB) |
-| Security | No cross-tenant read possible even with a buggy query (RLS enforced) |
+| Security | No cross-tenant read possible even with a buggy query (RLS enforced); no access/refresh token reachable from browser JS; role revocation effective in ≤ 5 min |
 
 ## 5. Non-goals
 
 - Real GoComet/carrier API integrations (simulator instead)
-- SSO / SAML (seeded users + JWT)
+- Per-client IdP federation (a client's Azure AD / Okta into its Keycloak organization): designed, stretch
 - Production Kubernetes manifests (described in the scaling doc only)
 - DataHub/OpenMetadata deployment
 - Mobile UI
@@ -79,7 +83,8 @@ Nova's answer: **configurable workflows whose steps are governed agents**, with 
 5. **(3:45)** Switch to *Bolt Logistics*: the same invoice routes differently (3 levels, $5K threshold). Same engine, different YAML.
 6. **(4:30)** Exceptions: start the event simulator. ClickHouse detects an ETA slip of more than 24 h, the triage agent (Jev severity + analyst SQL evidence) and recommender (SOP from Weaviate) run, and the ops lead gets the ExceptionPanel.
 7. **(5:45)** Kill the agents worker mid-run, restart it, and the run continues. Open Langfuse: cost per run, with Jev at fractions of a cent.
-8. **(6:30)** Edit `bol_intake` live: add a `decide` node and publish v2. In-flight runs stay on v1.
+8. **(6:15)** Access control: a Bolt user opens an Acme run URL → 404; an Acme `ops_lead` (limit $10K) tries to approve a $12K invoice through the API → 403 from OpenFGA.
+9. **(6:30)** Edit `bol_intake` live: add a `decide` node and publish v2. In-flight runs stay on v1.
 
 ## 7. Success criteria
 

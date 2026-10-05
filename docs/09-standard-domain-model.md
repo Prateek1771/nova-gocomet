@@ -75,7 +75,9 @@ User
 id, tenant_id, email, name
 ```
 
-Roles are **not columns**. They're OpenFGA tuples on the tenant: `member`, `admin`, `ops_exec`, `ops_lead`, `finance` (+ `controller` for Bolt). Per-user approval limits live on the tuple's `within_limit` condition context ([LLD §7](03-lld.md#7-authorization-openfga)).
+Identity and roles are **owned by Keycloak**, not Nova tables. The tenant is a Keycloak Organization (`tenants.keycloak_org_id`), and roles are `nova-api` client roles: `tenant_admin`, `process_designer`, `ops_exec`, `ops_lead`, `finance`, `controller`, `auditor`, `viewer`, plus `platform_admin`. `users` is a thin local mirror (sub, tenant, email, name), upserted on first login so audit rows and assignments can reference it.
+
+What a role may do (the RBAC matrix) lives in the **OpenFGA model**. How much it may approve lives in **TenantConfig `approval_limits`** ([LLD §7](03-lld.md#7-authorization-openfga), [ADR-019](06-adrs.md#adr-019-rbac--roles-in-keycloak-every-decision-in-openfga-via-contextual-tuples)).
 
 ### DocType (new: definitions as code)
 
@@ -184,6 +186,10 @@ invoice:
   auto_limit_usd: 2000
   l2_limit_usd: 10000
   l2_variance_pct: 5
+approval_limits:          # per role, USD; copied onto approver tuples at task creation
+  ops_lead: 10000
+  finance: 50000
+  controller: null        # unlimited
 exceptions:
   eta_slip_hours: 24
 llm_egress: cloud
@@ -287,9 +293,9 @@ Everything else goes in step outputs, extractions or config.
 ## 10. Standard relationship
 
 ```text
-Tenant
- ├── TenantConfig (versions)
- ├── Users ── (OpenFGA roles + limits)
+Tenant ═══ Keycloak Organization (users, roles, MFA, IdP)
+ ├── TenantConfig (versions) ── approval_limits per role
+ ├── Users (mirror of Keycloak sub) ── roles → OpenFGA contextual tuples
  ├── DocTypes ── ExtractionSchema · Checks · default Workflow
  ├── WorkflowDefinitions (versions) ── MicroApps
  │
@@ -307,7 +313,7 @@ Tenant
 | Component | Generic? | Notes |
 |---|---:|---|
 | Tenant / TenantConfig | Yes | Versioned config holds all thresholds |
-| User / roles | Yes | Roles and limits in OpenFGA, not columns |
+| User / roles | Yes | Identity + roles in Keycloak; capability matrix in OpenFGA; limits in TenantConfig |
 | WorkflowDefinition | Yes | YAML DSL, one interpreter |
 | WorkflowRun / RunStep | Yes | One model for every process |
 | HumanTask | Yes | Behaviour comes from the micro-app + output schema |

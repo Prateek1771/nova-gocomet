@@ -10,7 +10,9 @@
 flowchart LR
   ops([Ops exec / approver]) --> web
   admin([Process admin / FDE]) --> web
-  web[Nova Web<br/>React + React Flow] --> api[nova-api<br/>FastAPI]
+  web <-->|OIDC · PKCE| kc[[Keycloak<br/>realm nova · org per tenant]]
+  api -. JWKS .-> kc
+  web[Nova Web<br/>Next.js + React Flow] --> api[nova-api<br/>FastAPI]
   carrier[[Carrier / tracking feed<br/>simulated]] --> kafka[(Kafka)]
   email[[Email / upload]] --> api
   api --> llm{{LiteLLM gateway}}
@@ -23,7 +25,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph Client
-    WEB[Nova Web<br/>Vite · React · React Flow · shadcn]
+    WEB[Nova Web<br/>Next.js App Router · React Flow · shadcn]
   end
 
   subgraph App["Nova processes (Python)"]
@@ -35,6 +37,7 @@ flowchart TB
 
   subgraph Platform
     TMP[Temporal server + UI]
+    KC[Keycloak<br/>OIDC · orgs · roles · MFA]
     FGA[OpenFGA]
     LLM[LiteLLM proxy]
     LF[Langfuse]
@@ -51,7 +54,11 @@ flowchart TB
     DBT[dbt job]
   end
 
-  WEB -->|REST / SSE| API
+  WEB -->|BFF proxy · Bearer · REST / SSE| API
+  WEB <-->|OIDC code + PKCE| KC
+  API -.->|JWKS| KC
+  WEB -->|sessions| RED
+  KC --> PG
   API -->|start / signal / query| TMP
   ENG <-->|task queue: engine| TMP
   AGT <-->|task queue: agents| TMP
@@ -81,7 +88,9 @@ flowchart TB
 
 | Container | Owns | Never does |
 |---|---|---|
-| **nova-api** | Auth (JWT), CRUD for definitions/apps/docs, DSL validation, start/signal runs, SSE run updates, inbox queries | Long-running work, LLM calls (except "test this node") |
+| **nova-web** | Next.js: routing, layouts, server-rendered read views, client islands (studio, inbox, micro-apps), OIDC BFF (Keycloak login, Redis session), `/api/v1` proxy with bearer | Business logic, DB access, authz decisions |
+| **Keycloak** | Identity, tenant Organizations, roles, MFA, sessions, SSO / IdP federation | Authorization decisions on objects |
+| **nova-api** | JWT validation (JWKS), OpenFGA checks, CRUD for definitions/apps/docs, DSL validation, start/signal runs, SSE run updates, inbox queries | Long-running work, LLM calls (except "test this node") |
 | **engine-worker** | The one generic `NovaWorkflow`: walks the DSL graph, evaluates CEL, runs `decide` via Jev, creates human tasks, waits on signals, timers/SLA/escalation | Domain logic of any specific workflow |
 | **agents-worker** | LangGraph agents as Temporal activities: extraction, validation, matching, analysis, recommendation | Workflow control flow (it returns results; the engine decides) |
 | **ingest** | Shipment event simulator, Kafka → workflow-trigger router, outbox relay checks | Business decisions |
@@ -170,8 +179,15 @@ Each stage is a LangGraph node in a shared `governed_agent` template. Individual
 
 ## 6. Cross-cutting concerns
 
-- **AuthN:** JWT (seeded users) in the prototype. The shape is OIDC-compatible so Keycloak/Auth0 can be dropped in.
-- **AuthZ:** OpenFGA for relationships and approval limits. Postgres RLS is defense in depth for tenancy.
+- **Identity & access (three layers, one job each):**
+
+  | Layer | Owns | Never does |
+  |---|---|---|
+  | **Keycloak** (OIDC) | Who you are, which tenant (Organization), which roles; MFA, brute-force protection, sessions, SSO/IdP federation | Object-level decisions, approval limits |
+  | **OpenFGA** | Every authz decision: role → capability (RBAC matrix) and object relationships (ReBAC) + `within_limit` | Storing who has which role (roles arrive as contextual tuples from the token) |
+  | **Postgres RLS**, CH row policies, Weaviate tenants | Tenant isolation as defence in depth | Role logic |
+
+  A role in the JWT is never enough on its own: every protected endpoint asks OpenFGA. Design: [LLD §7](03-lld.md#7-authorization-openfga), [§7a](03-lld.md#7a-authentication-keycloak), [ADR-018–020](06-adrs.md#adr-018-keycloak-for-authentication-one-realm-one-organization-per-tenant).
 - **Observability:** OTel SDK in all Python processes → OTel Collector → (prototype) Jaeger-compatible endpoint in Langfuse / console. Langfuse for LLM. Temporal UI for execution.
 - **Cost control:** LiteLLM virtual key per tenant with `max_budget`; alias tiers `nova-extract-text`, `nova-extract-vision`, `nova-reason`, `nova-decide`, `nova-embed`; `LLM_MODE=local|cheap|demo` selects the LiteLLM config ([brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)); Redis response cache on.
 - **Idempotency:** every side-effecting activity takes an idempotency key `run_id:node_id:attempt-agnostic`. Outbox for external notifications.
@@ -183,12 +199,14 @@ Docker Compose, three profiles plus local LLMs. Target machine: 32 GB RAM, 4C/8T
 
 | Profile | Services | ~RAM |
 |---|---|---|
-| `core` | postgres, redis, minio, temporal, temporal-ui, openfga, litellm, **ollama** (nomic-embed-text), nova-api, engine-worker, agents-worker, web | ~4.6 GB |
+| `core` | postgres, redis, minio, temporal, temporal-ui, **keycloak**, openfga, litellm, **ollama** (nomic-embed-text), nova-api, engine-worker, agents-worker, web | ~5.3 GB |
 | `data` | kafka (KRaft), kafka-connect+debezium, clickhouse, ingest, dbt (one-shot) | ~3.5 GB |
 | `ai` | langfuse-web, langfuse-worker, weaviate, otel-collector | ~2.8 GB |
-| **full** = all three | | **~10.9 GB** |
+| **full** = all three | | **~11.6 GB** |
 | local LLMs (`LLM_MODE=local\|cheap`) | Ollama keeps at most 2 models loaded, e.g. qwen2.5:7b + gemma3:4b | +6–9 GB |
-| **full + local LLMs** | | **~17–20 GB** → fits in the 24 GB WSL cap |
+| **full + local LLMs** | | **~18–21 GB** → fits in the 24 GB WSL cap |
+
+The table is the M7 target. `core` grows one milestone at a time; [07 M0](07-build-plan.md#m0--skeleton) lists the current slice.
 
 `make up` = core (workflows 1 & 2 run; agent tracing logs locally). `make up-full` = everything (adds workflow 3, Langfuse, and SOP retrieval). `make up-local` = everything + `LLM_MODE=local`: $0 and offline, but CPU-only, so a BoL run takes ~2–4 min (see [brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)).
 
@@ -201,5 +219,7 @@ Docker Compose, three profiles plus local LLMs. Target machine: 32 GB RAM, 4C/8T
 | Low extraction confidence | Field-level threshold in YAML routes to human review. Never auto-approves below threshold |
 | Worker crash | Temporal replays; activities are idempotent |
 | Kafka/ClickHouse down | Document workflows unaffected (they don't depend on the `data` profile); detection schedule fails and retries |
+| Keycloak down | Existing sessions keep working until the access token can't be refreshed, then the user re-logs in; new logins fail; the API keeps validating with cached JWKS |
+| Role revoked in Keycloak | Effective at the next token refresh (≤ 5 min); FGA never stores roles, so there's nothing to clean up |
 | Duplicate upload | sha256 dedupe per tenant returns the existing run |
 | LLM returns invalid JSON | Structured output via schema; one repair retry; then a human task |

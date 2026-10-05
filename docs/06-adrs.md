@@ -96,3 +96,31 @@ Format: Context → Decision → Alternatives → Consequences. Status for all: 
 **Context.** No GPU. Vision models on CPU take minutes per page and are less accurate. Most carrier PDFs, and all our synthetic ones apart from the planted scan, have a text layer.
 **Decision.** `doc_extractor` reads text and word coordinates with `pdfplumber`, extracts fields with a text model using structured JSON output, and recovers bboxes by matching values back to word coordinates. `nova-extract-vision` is called only for pages without a text layer.
 **Consequences.** Several times faster and cheaper in every mode, and the evidence highlights still work. Fuzzy value→bbox matching (dates and numbers reformatted by the model) needs normalisation and a test set. Scans remain the slow path.
+
+## ADR-017: Next.js App Router for the web app; FastAPI stays the only backend
+
+**Context.** The web app was specified as a Vite SPA with TanStack Router. The project now standardises on Next.js.
+**Decision.** `apps/web` is Next.js (App Router, TypeScript, `output: 'standalone'`). Pages are Server Components that read from `nova-api`. Interactive surfaces (React Flow studio, Monaco, PDF viewer, micro-apps) are client islands loaded with `next/dynamic({ ssr: false })`. `/api/v1/*` is proxied to `nova-api` by a route handler (originally `rewrites`; changed by ADR-020).
+**Alternatives.** Vite SPA + TanStack Router: simpler, but no server rendering or file routing, and not the chosen standard. Next.js as a BFF with its own data access: it would split validation and authz across two backends, which breaks "the backend is authoritative".
+**Consequences.** One more Node container (~150–250 MB). Heavy editors must stay client-only. SSE goes through the ADR-020 route-handler proxy, which streams the upstream body. Supersedes the Vite/TanStack Router rows of LLD §10 (now updated).
+
+## ADR-018: Keycloak for authentication; one realm, one Organization per tenant
+
+**Context.** The prototype planned seeded users and a home-grown `/auth/token`. Enterprise logistics clients expect SSO, MFA, session control and, eventually, their own IdP. It's the first thing a security review asks about.
+**Decision.** Keycloak 26.x is the OIDC provider in every environment, local included. There's one realm, `nova`, and each tenant is a **Keycloak Organization** (GA since 26), mapped through `tenants.keycloak_org_id`. Roles are `nova-api` client roles. Clients: `nova-web` (confidential, PKCE), `nova-api` (audience), `nova-admin` (service account). The realm is defined as code (`infra/keycloak/realm-nova.json`).
+**Alternatives.** Realm per tenant: strong isolation, but N realms to configure and upgrade, and awkward for cross-tenant platform users; Organizations are the current B2B model. Auth0/Clerk/WorkOS: hosted, but an external SaaS with per-MAU cost that can't be self-hosted inside a residency cell. Home-grown JWT: no MFA, SSO or federation, so it won't pass an enterprise review.
+**Consequences.** One more container (~0.7 GB) in `core`. Per-tenant IdP federation (the client's Azure AD/Okta) becomes configuration on the organization (stretch). A user belongs to one organization in the prototype; multi-org users (FDEs) need org-scoped groups later. If Keycloak is down, new logins fail, while existing sessions keep working until their tokens expire.
+
+## ADR-019: RBAC — roles in Keycloak, every decision in OpenFGA via contextual tuples
+
+**Context.** We need role-based access (who may design, publish, operate, approve, audit) *and* object-level ReBAC with amount limits, without two authz systems that drift and without a Keycloak→OpenFGA sync job.
+**Decision.** Keycloak is the source of truth for **who has which role**. OpenFGA holds the **capability matrix** (role → capability relations on `tenant`/`workflow`/`run`/`task`) and decides every request. Roles from the token are sent as **contextual tuples** on each Check/ListObjects (OpenFGA's token-claims pattern) and are never stored. Persisted tuples are only Nova's own facts: ownership, assignment, approver + `within_limit`. Approval limits are per-role values in versioned TenantConfig, copied onto approver tuples at task creation.
+**Alternatives.** RBAC in Keycloak only (role checks in Python): approval logic gets hardcoded and per-object rules become impossible. Keycloak Authorization Services: a second policy engine, and weak for "tasks I can act on" queries. Syncing roles into FGA through a Keycloak event-listener SPI (e.g. keycloak-openfga-event-publisher): a Java extension to operate, with sync lag and new failure modes.
+**Consequences.** One authz source (the FGA model) and one identity source (Keycloak). Revoking a role takes effect within the 5-min access-token TTL. Background code without a user token (the engine assigning tasks) uses role usersets (`tenant:acme#finance`), so it needs no user list. Notifying "all finance users" resolves members through the Keycloak Admin API. `platform_admin` manages tenants but has no tenant-data capability.
+
+## ADR-020: Next.js as a BFF; tokens stay server-side
+
+**Context.** The earlier web plan put a session cookie in the browser and proxied with `rewrites`, which can neither attach nor refresh a bearer token.
+**Decision.** Next.js route handlers implement the OIDC client with `openid-client` (auth code + PKCE): `/api/auth/login`, `/api/auth/callback`, `/api/auth/logout` (RP-initiated logout). Tokens are stored in Redis under a random session ID, and the browser only gets an httpOnly `SameSite=Lax` cookie. `app/api/v1/[...path]` proxies to `nova-api`: it refreshes tokens near expiry, attaches `Authorization: Bearer`, and streams responses (SSE included). `proxy.ts` (Next.js 16's name for middleware) guards pages.
+**Alternatives.** Auth.js v5 with the Keycloak provider: less code, but by default it keeps tokens in an encrypted JWT cookie, and refresh handling is DIY anyway. Browser-held tokens (keycloak-js): access and refresh tokens are exposed to XSS.
+**Consequences.** No token is reachable from browser JS. Same origin, so no CORS. Redis becomes a hard dependency of web login (it's already in `core`). CSRF is covered by `SameSite=Lax` plus an Origin check on mutating `/api/v1` calls.

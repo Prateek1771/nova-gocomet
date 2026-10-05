@@ -60,7 +60,7 @@ The design keeps the **DSL, the interpreter, and the agent template unchanged ac
 - **Postgres:** managed, Multi-AZ, PgBouncer in transaction mode. Monthly partitioning on `run_steps`, `audit_log`, `outbox`.
 - **Kafka:** managed (MSK/Confluent), 3 brokers, 12 partitions on `shipment.events`.
 - **LLM:** turn on prompt caching for system prompts and schemas. Dedupe extractions by `sha256`. Make `nova-extract-*` **small-model-first, escalate on low confidence**.
-- **Web:** static build on a CDN.
+- **Web:** Next.js standalone pods (stateless, HPA on CPU) behind a CDN that caches `/_next/static` and images. Server Components only call `nova-api`, so the web tier scales independently of everything else.
 - **SLOs introduced:** API p99 < 300 ms; doc-to-task p95 < 60 s; run-start availability 99.9%.
 
 ### Tier 3 — 100K users (100+ tenants, first large enterprises)
@@ -121,6 +121,7 @@ flowchart TB
 | Temporal | Cloud / 512 shards | Cloud | Cloud / Cassandra | namespace per cell |
 | Kafka | 1 broker | 3 brokers managed | 48 partitions, schema registry, tiered | per region |
 | ClickHouse | 1 node | 1 node + replica | 2×2 sharded | regional clusters |
+| Keycloak | 1 node | 2 nodes HA (Infinispan) | 3+ per region | multi-site global IdP in the control plane; orgs = tenants |
 | OpenFGA | 1 | 2 | 3+ with cache | per cell |
 | Live updates | SSE from api | SSE from api | push gateway | push gateway per cell |
 | LLM | OpenRouter via LiteLLM | + caching, small-first | + templates, batch, budgets | + self-hosted VLM, eval-gated |

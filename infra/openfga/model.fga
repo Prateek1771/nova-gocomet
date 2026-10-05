@@ -1,0 +1,59 @@
+# Source of truth for authz (LLD §7). Loaded into OpenFGA in M4; CI validates it from M0.
+model
+  schema 1.1
+
+type user
+
+type tenant
+  relations
+    # roles: never stored; sent as contextual tuples from the Keycloak token (ADR-019)
+    define platform_admin: [user]
+    define tenant_admin: [user]
+    define process_designer: [user]
+    define ops_exec: [user]
+    define ops_lead: [user]
+    define finance: [user]
+    define controller: [user]
+    define auditor: [user]
+    define viewer: [user]
+    define member: tenant_admin or process_designer or ops_exec or ops_lead or finance or controller or auditor or viewer
+    # capabilities = the RBAC matrix (01-prd FR-X.5)
+    define can_manage_users: tenant_admin
+    define can_edit_config: tenant_admin
+    define can_manage_budgets: tenant_admin
+    define can_design: tenant_admin or process_designer
+    define can_operate: ops_exec or ops_lead or finance
+    define can_view: member
+    define can_view_analytics: tenant_admin or process_designer or ops_lead or finance or controller or auditor or viewer
+    define can_read_audit: tenant_admin or auditor
+
+type platform
+  relations
+    define admin: [user]
+    define can_manage_tenants: admin
+
+type workflow
+  relations
+    define tenant: [tenant]
+    define can_view: can_view from tenant
+    define can_edit: can_design from tenant
+    define can_publish: can_design from tenant
+    define can_start: can_operate from tenant
+
+type run
+  relations
+    define workflow: [workflow]
+    define can_view: can_view from workflow
+    define can_cancel: can_publish from workflow
+
+type task
+  relations
+    define run: [run]
+    define assignee: [user, tenant#ops_exec, tenant#ops_lead, tenant#finance, tenant#controller]
+    define approver: [user with within_limit, tenant#ops_lead with within_limit, tenant#finance with within_limit, tenant#controller with within_limit]
+    define can_view: assignee or approver or can_view from run
+    define can_complete: assignee or approver
+
+condition within_limit(amount: double, limit: double) {
+  amount <= limit
+}

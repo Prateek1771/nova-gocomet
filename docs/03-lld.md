@@ -7,9 +7,19 @@ Monorepo. Python managed as a **uv workspace**, front end with **pnpm**.
 ```
 nova/
 ├─ apps/
-│  └─ web/                         # Vite + React + TS
+│  └─ web/                         # Next.js (App Router) + React + TS, output: standalone
 │     └─ src/
-│        ├─ app/                   # router, providers, layout shell
+│        ├─ app/                   # App Router: routes only, thin
+│        │  ├─ (auth)/login/
+│        │  ├─ (app)/layout.tsx    # shell, providers, session guard
+│        │  ├─ (app)/studio/[key]/ # page.tsx (server) → <Studio/> client island
+│        │  ├─ (app)/runs/[id]/
+│        │  ├─ (app)/inbox/[[...task]]/
+│        │  ├─ (app)/documents/  (app)/exceptions/  (app)/admin/
+│        │  └─ api/
+│        │     ├─ auth/{login,callback,logout}/  # OIDC BFF with Keycloak (openid-client, PKCE); Redis session
+│        │     └─ v1/[...path]/    # proxy to nova-api: attach bearer, refresh, stream (SSE)
+│        ├─ proxy.ts               # Next.js 16 (was middleware.ts): no session → /api/auth/login
 │        ├─ features/
 │        │  ├─ studio/             # React Flow editor, YAML pane, node config panels
 │        │  ├─ runs/               # run list, live run graph, step inspector
@@ -19,7 +29,7 @@ nova/
 │        │  └─ admin/              # tenants, roles, budgets
 │        ├─ microapps/             # component registry + JSON renderer
 │        ├─ dsl/                   # TS types generated from DSL JSON Schema
-│        └─ lib/                   # api client (generated from OpenAPI), sse, auth
+│        └─ lib/                   # api client (generated from OpenAPI; server + browser variants), sse, auth
 ├─ services/
 │  ├─ api/          nova_api/      # FastAPI app: routers/, deps.py, sse.py
 │  ├─ engine/       nova_engine/   # Temporal worker: interpreter.py, activities/, cel.py, decide.py
@@ -41,6 +51,7 @@ nova/
 │  ├─ postgres/init/*.sql          # dbs for nova, temporal, openfga, litellm, langfuse; RLS
 │  ├─ clickhouse/init/*.sql
 │  ├─ kafka-connect/debezium-nova.json
+│  ├─ keycloak/realm-nova.json     # realm as code: clients, roles, orgs Acme/Bolt, dev users
 │  ├─ openfga/model.fga
 │  ├─ litellm/config.yaml
 │  ├─ otel/collector.yaml
@@ -127,10 +138,10 @@ layout:                    # written by the studio, ignored by the engine
 | `rule` | engine (in-workflow, deterministic) | CEL `cases` evaluated in order → `goto` |
 | `human_task` | engine: create task activity, then `workflow.wait_condition` on signal | Branch by `outputs`; SLA timer → escalate |
 | `action` | engine activity | Registered side effect (notify, tms.upsert, http) with idempotency key |
-| `parallel` | engine | `branches: [[node ids]]`, `join: all|any` |
+| `parallel` | engine | `branches: [[node ids]]`, `join: all\|any` |
 | `wait` | engine | Durable timer or wait-for-event (signal) |
 | `subflow` | engine | Child workflow by key@version |
-| `end` | engine | Terminal; `status: completed|rejected|cancelled` |
+| `end` | engine | Terminal; `status: completed\|rejected\|cancelled` |
 
 ### 2.3 Expressions
 
@@ -146,19 +157,22 @@ layout:                    # written by the studio, ignored by the engine
 class NovaWorkflow:
     @workflow.run
     async def run(self, req: RunRequest) -> RunResult:
-        d = await workflow.execute_activity(load_definition, req.def_ref)   # immutable version + TenantConfig snapshot
+        d = await workflow.execute_activity(
+            load_definition, req.def_ref
+        )  # immutable version + TenantConfig snapshot
         ctx = RunContext(input=req.input, tenant=d.tenant_config)
         node = d.entry
         while node.type != "end":
             await self._project(node, "running")
-            out = await HANDLERS[node.type](self, node, ctx)               # each handler is small
+            out = await HANDLERS[node.type](self, node, ctx)  # each handler is small
             ctx.nodes[node.id] = out
             await self._project(node, "completed", out)
-            node = d.next(node, out, ctx)                                   # edges + rule goto + outputs
+            node = d.next(node, out, ctx)  # edges + rule goto + outputs
         return RunResult(status=node.status, ctx=ctx)
 
     @workflow.signal
-    def task_completed(self, s: TaskSignal): self.signals[s.task_id] = s
+    def task_completed(self, s: TaskSignal):
+        self.signals[s.task_id] = s
 
     @workflow.query
     def state(self) -> RunState: ...
@@ -179,18 +193,23 @@ class AgentSpec(BaseModel):
     output_schema: type[BaseModel]
     model_tier: Literal["extract", "reason", "decide"]
     tools: list[Tool]
-    context_sources: list[ContextSource]   # master_data, metric, sop_search, contract_index
+    context_sources: list[ContextSource]  # master_data, metric, sop_search, contract_index
     max_steps: int = 8
+
 
 def build_governed_agent(spec: AgentSpec) -> CompiledGraph:
     g = StateGraph(AgentState)
-    g.add_node("scope", resolve_scope)            # tenant, actor, entity refs; FGA list_objects filter
-    g.add_node("context", compile_context)        # pulls only allowed sources; token-budgeted
-    g.add_node("route", route_schema)             # output schema version + LiteLLM alias
-    g.add_node("execute", plan_and_execute)       # tool loop ≤ max_steps
-    g.add_node("deliver", deliver_evidence)       # validate → repair once → persist evidence, trace id
-    g.add_edge(START, "scope"); g.add_edge("scope", "context"); g.add_edge("context", "route")
-    g.add_edge("route", "execute"); g.add_edge("execute", "deliver"); g.add_edge("deliver", END)
+    g.add_node("scope", resolve_scope)  # tenant, actor, entity refs; FGA list_objects filter
+    g.add_node("context", compile_context)  # pulls only allowed sources; token-budgeted
+    g.add_node("route", route_schema)  # output schema version + LiteLLM alias
+    g.add_node("execute", plan_and_execute)  # tool loop ≤ max_steps
+    g.add_node("deliver", deliver_evidence)  # validate → repair once → persist evidence, trace id
+    g.add_edge(START, "scope")
+    g.add_edge("scope", "context")
+    g.add_edge("context", "route")
+    g.add_edge("route", "execute")
+    g.add_edge("execute", "deliver")
+    g.add_edge("deliver", END)
     return g.compile()
 ```
 
@@ -249,7 +268,7 @@ Request: `questions[]` + compact JSON context (≤ 4K tokens). The prompt forces
 All tables have `tenant_id uuid not null` + RLS `USING (tenant_id = current_setting('app.tenant_id')::uuid)`. The app connects as the non-owner role `nova_app`, so RLS can't be bypassed by accident.
 
 ```sql
-tenants(id, slug, name)
+tenants(id, slug, name, keycloak_org_id unique)               -- token organization → tenant
 tenant_configs(tenant_id, version, config jsonb, published_by, published_at,  -- thresholds, approval matrix, currencies
                primary key(tenant_id, version))
 users(id, tenant_id, email, name)
@@ -315,31 +334,62 @@ Partitions: 6 in the prototype. Consumers are idempotent by (topic, partition, o
 
 ## 7. Authorization (OpenFGA)
 
+Identity and roles come from Keycloak ([§7a](#7a-authentication-keycloak)). OpenFGA makes **every** authorization decision: the RBAC capability matrix plus the object relationships.
+
 ```
 model
   schema 1.1
+
 type user
+
 type tenant
   relations
-    define member: [user]
-    define admin: [user]
+    # roles: never stored; sent as contextual tuples from the Keycloak token (ADR-019)
+    define platform_admin: [user]
+    define tenant_admin: [user]
+    define process_designer: [user]
     define ops_exec: [user]
     define ops_lead: [user]
     define finance: [user]
+    define controller: [user]
+    define auditor: [user]
+    define viewer: [user]
+    define member: tenant_admin or process_designer or ops_exec or ops_lead or finance or controller or auditor or viewer
+    # capabilities = the RBAC matrix (01-prd FR-X.5)
+    define can_manage_users: tenant_admin
+    define can_edit_config: tenant_admin
+    define can_manage_budgets: tenant_admin
+    define can_design: tenant_admin or process_designer
+    define can_operate: ops_exec or ops_lead or finance
+    define can_view: member
+    define can_view_analytics: tenant_admin or process_designer or ops_lead or finance or controller or auditor or viewer
+    define can_read_audit: tenant_admin or auditor
+
+type platform
+  relations
+    define admin: [user]
+    define can_manage_tenants: admin
+
 type workflow
   relations
     define tenant: [tenant]
-    define editor: admin from tenant
-    define viewer: member from tenant
+    define can_view: can_view from tenant
+    define can_edit: can_design from tenant
+    define can_publish: can_design from tenant
+    define can_start: can_operate from tenant
+
 type run
   relations
     define workflow: [workflow]
-    define viewer: viewer from workflow
+    define can_view: can_view from workflow
+    define can_cancel: can_publish from workflow
+
 type task
   relations
     define run: [run]
-    define assignee: [user, tenant#ops_exec, tenant#ops_lead, tenant#finance]
-    define approver: [user with within_limit, tenant#finance with within_limit, tenant#ops_lead with within_limit]
+    define assignee: [user, tenant#ops_exec, tenant#ops_lead, tenant#finance, tenant#controller]
+    define approver: [user with within_limit, tenant#ops_lead with within_limit, tenant#finance with within_limit, tenant#controller with within_limit]
+    define can_view: assignee or approver or can_view from run
     define can_complete: assignee or approver
 
 condition within_limit(amount: double, limit: double) {
@@ -347,13 +397,100 @@ condition within_limit(amount: double, limit: double) {
 }
 ```
 
-Per-user approval limits are stored on the tuple condition context. `can_complete` is checked with `{amount}` from the task payload. This is how "L1 up to $10K" lives in data, not code.
+**RBAC matrix** (what the capability relations above encode):
+
+| Capability | platform_admin | tenant_admin | process_designer | ops_exec | ops_lead | finance | controller | auditor | viewer |
+|---|---|---|---|---|---|---|---|---|---|
+| Manage tenants | ✅ | | | | | | | | |
+| Manage org users/roles (Keycloak org admin) | | ✅ | | | | | | | |
+| Edit/publish TenantConfig | | ✅ | | | | | | | |
+| Edit & publish workflows, apps | | ✅ | ✅ | | | | | | |
+| Upload documents / start runs | | | | ✅ | ✅ | ✅ | | | |
+| View runs & documents | | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Complete assigned tasks | | | | ✅ | ✅ | ✅ | ✅ | | |
+| Approve within limit | | | | | ✅ | ✅ | ✅ | | |
+| Analytics | | ✅ | ✅ | | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Read audit log | | ✅ | | | | | | ✅ | |
+| Budgets / LLM spend | | ✅ | | | | | | | |
+
+`platform_admin` manages tenants but has **no tenant-data capability** (no RLS bypass). Break-glass support access (time-boxed, audited) is a stretch item.
+
+**Who writes which tuples:**
+
+| Tuples | Written by | Example |
+|---|---|---|
+| Roles (`tenant:<t>#<role>@user:<sub>`) | **Nobody.** Built per request from the token's `nova-api` client roles and sent as contextual tuples | `tenant:acme#finance@user:9f1c…` |
+| `platform:nova#admin@user:<sub>` | Contextual, from the `platform_admin` role | |
+| `workflow:<id>#tenant@tenant:<t>` | API, on workflow create | |
+| `run:<id>#workflow@workflow:<id>` | Engine, on run start | |
+| `task:<id>#run@run:<id>` | Engine, on task create | |
+| `task:<id>#assignee@…` | Engine, from the node's `assignee` (role or user); delegation adds a user | `task:T#assignee@tenant:acme#ops_exec` |
+| `task:<id>#approver@… with within_limit{limit}` | Engine; `limit` = `TenantConfig.approval_limits[role]` from the run's pinned `config_version` | `task:T#approver@tenant:acme#finance` `{limit: 50000}` |
+
+`can_complete` is checked with `{amount}` from the task payload. "Finance up to $50K" lives in versioned config, gets copied onto the task when it's created, and is audited with it. It's never in code, and the JWT alone never grants it.
+
+**Check call** (the FastAPI `require` dependency):
+
+```python
+await fga.check(
+    user=f"user:{p.sub}",
+    relation="can_complete",
+    object=f"task:{task_id}",
+    context={"amount": task.payload["amount_usd"]},
+    contextual_tuples=[
+        {"user": f"user:{p.sub}", "relation": r, "object": f"tenant:{p.tenant_slug}"} for r in p.roles
+    ],
+)
+```
+
+The inbox uses `ListObjects(user, can_view, task)` with the same contextual tuples. A role revoked in Keycloak stops working within one access-token lifetime (5 min).
+
+## 7a. Authentication (Keycloak)
+
+| Item | Value |
+|---|---|
+| Version | Keycloak 26.x (pin at M0) |
+| Realm | `nova` (one realm) |
+| Tenants | One **Keycloak Organization** per tenant; organization claim in the token → `tenants.keycloak_org_id` → `tenant_id` |
+| Clients | `nova-web` (confidential, auth code + PKCE, used only by the Next.js server) · `nova-api` (audience, owns the client roles) · `nova-admin` (service account, provisioning/seed only) |
+| Roles | `nova-api` client roles: `platform_admin`, `tenant_admin`, `process_designer`, `ops_exec`, `ops_lead`, `finance`, `controller`, `auditor`, `viewer` |
+| Tokens | Access 5 min; refresh rotation; SSO idle 30 min / max 10 h |
+| Security | Brute-force detection, password policy, **MFA (OTP/WebAuthn) for `platform_admin`, `tenant_admin`, `finance`, `controller`** in staging/prod (off in the dev realm) |
+| Config | `infra/keycloak/realm-nova.json`, imported with `--import-realm` locally; keycloak-config-cli or the Terraform provider in shared envs |
+| Events | Login + admin events on, 30-day retention |
+
+**FastAPI validation** (`nova_core.auth`): PyJWT + `PyJWKClient` (cached JWKS from `${KEYCLOAK_ISSUER}/protocol/openid-connect/certs`). It requires a valid signature, `iss`, `aud` containing `nova-api`, `exp`, and `azp=nova-web`. Principal = `{sub, tenant_id, tenant_slug, roles}`. A token without an organization is only accepted for `platform_admin`. `tenant_id` sets `app.tenant_id` for RLS. `users` is a thin mirror (sub, tenant, email, name), upserted on first request.
+
+**Login sequence:**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser
+  participant N as nova-web (Next.js BFF)
+  participant K as Keycloak
+  participant R as Redis
+  participant A as nova-api
+  U->>B: open /inbox
+  B->>N: GET /inbox (no session)
+  N-->>B: 302 /api/auth/login → Keycloak authorize (PKCE, state, nonce)
+  K-->>U: login (+ MFA for privileged roles)
+  K-->>N: /api/auth/callback?code
+  N->>K: code → tokens
+  N->>R: store {access, refresh, id_token} under a random session id
+  N-->>B: Set-Cookie nova_sid (httpOnly, SameSite=Lax)
+  B->>N: GET /api/v1/tasks (cookie)
+  N->>A: GET /api/v1/tasks (Authorization: Bearer)
+  A->>A: verify JWT via JWKS → principal
+  A->>A: OpenFGA ListObjects(can_view, contextual role tuples)
+```
 
 ## 8. API (FastAPI, `/api/v1`)
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/auth/token` | seeded users → JWT (`sub`, `tenant_id`) |
+| GET | `/me` | principal from the Keycloak token: sub, tenant, roles, capabilities |
 | GET/POST | `/workflows` | list / create draft |
 | GET/PUT | `/workflows/{key}/draft` | YAML body; returns validation result |
 | POST | `/workflows/{key}/validate` | DSL + graph + CEL + reference checks |
@@ -370,6 +507,21 @@ Per-user approval limits are stored on the tuple condition context. `can_complet
 | GET/PUT | `/apps/{key}` | micro-app definitions |
 | GET | `/analytics/metrics/{name}` | dbt metric via ClickHouse |
 | GET | `/catalog/agents`, `/catalog/actions` | for studio palettes |
+
+Every route except `/healthz` and `/readyz` needs a valid Keycloak access token (`aud=nova-api`) plus the capability below, checked in OpenFGA:
+
+| Route family | Capability (FGA relation on object) |
+|---|---|
+| `GET /workflows*`, `/runs*`, `/documents*` | `can_view` on tenant / workflow / run |
+| `PUT /workflows/{key}/draft`, `PUT /apps/*` | `can_edit` on workflow · `can_design` on tenant |
+| `POST /workflows/{key}/publish` | `can_publish` on workflow |
+| `POST /runs`, `POST /documents` | `can_start` on workflow · `can_operate` on tenant |
+| `POST /runs/{id}/cancel` | `can_cancel` on run |
+| `GET /tasks`, `POST /tasks/{id}/claim`, `POST /tasks/{id}/complete` | `ListObjects can_view` · `can_complete` with `{amount}` |
+| `GET /analytics/*` | `can_view_analytics` on tenant |
+| `GET /audit` | `can_read_audit` on tenant |
+| `PUT /tenant-config` | `can_edit_config` on tenant |
+| `/admin/tenants*` | `can_manage_tenants` on platform |
 
 Errors use one envelope: `{error:{code,message,details[]}, request_id}`. The OpenAPI spec generates the web client.
 
@@ -400,15 +552,19 @@ Bindings are JSONPath over the task's run-context snapshot. The renderer is a ~1
 
 | Concern | Choice |
 |---|---|
-| Build | Vite + React 19 + TypeScript |
+| Framework | **Next.js (App Router)** + React 19 + TypeScript, `output: 'standalone'` Docker image ([ADR-017](06-adrs.md#adr-017-nextjs-app-router-for-the-web-app-fastapi-stays-the-only-backend)) |
 | Graph editor | `@xyflow/react` (React Flow) + `elkjs` auto-layout |
 | UI kit | Tailwind v4 + shadcn/ui + lucide; `cmdk` command palette |
-| Data | TanStack Query; SSE via `EventSource` → query cache updates |
-| Routing | TanStack Router |
+| Data | Server Components fetch read-only views (run list, analytics) from `nova-api`; TanStack Query in client islands; SSE via `EventSource` → query cache updates |
+| Routing | App Router (file-based, route groups `(auth)` / `(app)`); `proxy.ts` session guard; nav items hidden by role (cosmetic; the server enforces) |
+| API access | `app/api/v1/[...path]/route.ts` proxies to `nova-api` on the same origin (no CORS): loads the session, refreshes the access token when < 60 s remain, adds `Authorization: Bearer`, and streams the upstream body back (SSE included) |
+| Auth | **BFF.** `openid-client` auth code + PKCE against Keycloak; tokens kept server-side in Redis; the browser holds only an httpOnly `SameSite=Lax` session-id cookie ([ADR-020](06-adrs.md#adr-020-nextjs-as-a-bff-tokens-stay-server-side)) |
 | YAML pane | Monaco + `monaco-yaml` with the DSL JSON Schema (inline validation + autocomplete) |
 | PDF + bbox | `react-pdf` + absolutely-positioned overlay |
 | Charts | Recharts (exceptions dashboard) |
 | Forms | `@rjsf/core` for `FieldForm` driven by extraction schema |
+
+**Server vs client:** pages are Server Components by default. React Flow, Monaco, `react-pdf` and micro-apps are `"use client"` islands loaded with `next/dynamic({ ssr: false })` because they need `window`. Next.js holds **no business logic and no DB access**: every read and write goes through `nova-api`, which stays the single authority for validation, authz and tenancy.
 
 **Graph ↔ YAML sync:** YAML text is canonical. Graph edits become targeted mutations on an eemeli/`yaml` `parseDocument()` AST, keyed by node `id`, so untouched lines and comments survive byte-for-byte. YAML edits are re-parsed with a 300 ms debounce. If the YAML is invalid, the graph keeps its last valid state. Full design and CI round-trip test: [brainstorm §6.2](00-brainstorm.md#62-react-flow--yaml-sync-how-we-avoid-losing-comments-and-order).
 

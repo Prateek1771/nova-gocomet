@@ -1,0 +1,13 @@
+# Keep rules that catch broken rendering; prose style is not linted.
+config:
+  default: true
+  MD001: false
+  MD012: false
+  MD013: false
+  MD022: false
+  MD024: false
+  MD025: false
+  MD032: false
+  MD038: false
+  MD040: false
+  MD060: false

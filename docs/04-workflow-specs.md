@@ -87,7 +87,13 @@ flowchart LR
 | `l2_variance_pct` | 5 | 3 |
 | levels | L1 ops_lead → L2 finance | L1 ops_lead → L2 finance → L3 controller (`subflow`) |
 
-The OpenFGA `within_limit` condition backs this up at completion time, so an L1 user can't approve above their limit even through the API.
+The OpenFGA `within_limit` condition backs this up at completion time, so an L1 user can't approve above their limit even through the API. Per-role limits live in the same TenantConfig (`approval_limits`) and are copied onto the task's approver tuple when the engine creates it:
+
+| `approval_limits` (USD) | Acme | Bolt |
+|---|---|---|
+| `ops_lead` | 10,000 | 5,000 |
+| `finance` | 50,000 | 25,000 |
+| `controller` | unlimited | unlimited |
 
 **Matcher logic:**
 1. Deterministic: map invoice lines → PO lines by charge code + container. Compute line variance and FX-normalise to USD.

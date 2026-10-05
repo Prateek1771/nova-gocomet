@@ -1,0 +1,21 @@
+name: docs
+
+on:
+  pull_request:
+    paths: ["docs/**", "**/*.md", ".markdownlint-cli2.yaml"]
+
+permissions:
+  contents: read
+
+jobs:
+  markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v20
+        with: { globs: "docs/*.md README.md CLAUDE.md" }
+      # internal links + #anchors only; no network
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --include-fragments --no-progress "docs/*.md" README.md CLAUDE.md
+          fail: true

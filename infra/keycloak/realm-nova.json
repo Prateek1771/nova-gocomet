@@ -1,0 +1,397 @@
+{
+  "realm": "nova",
+  "displayName": "Nova",
+  "enabled": true,
+  "organizationsEnabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 10,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "roles": {
+    "client": {
+      "nova-api": [
+        {
+          "name": "platform_admin",
+          "description": "Manage tenants; no tenant data access"
+        },
+        {
+          "name": "tenant_admin",
+          "description": "Org users/roles, TenantConfig, budgets"
+        },
+        {
+          "name": "process_designer",
+          "description": "FDE: edit and publish workflows and apps"
+        },
+        {
+          "name": "ops_exec",
+          "description": "Upload docs, start runs, complete assigned tasks"
+        },
+        {
+          "name": "ops_lead",
+          "description": "Ops exec + approve within limit"
+        },
+        {
+          "name": "finance",
+          "description": "Approve within limit, analytics"
+        },
+        {
+          "name": "controller",
+          "description": "Final approver"
+        },
+        {
+          "name": "auditor",
+          "description": "Read runs, analytics and audit log"
+        },
+        {
+          "name": "viewer",
+          "description": "Read only"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "nova-api",
+      "name": "Nova API (audience + roles)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "nova-web",
+      "name": "Nova web (Next.js BFF)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "nova-web-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3300/api/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3300"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3300/*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "optionalClientScopes": [
+        "organization"
+      ],
+      "protocolMappers": [
+        {
+          "name": "audience nova-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "nova-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "organization",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-organization-membership-mapper",
+          "config": {
+            "claim.name": "organization",
+            "multivalued": "true",
+            "addOrganizationId": "true",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "nova-admin",
+      "name": "Nova provisioning (service account)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "nova-admin-dev-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-nova-admin",
+      "enabled": true,
+      "serviceAccountClientId": "nova-admin",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "manage-realm",
+          "view-realm"
+        ]
+      }
+    },
+    {
+      "username": "fde@acme",
+      "email": "fde@acme.test",
+      "firstName": "Farah",
+      "lastName": "FDE",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "process_designer"
+        ]
+      }
+    },
+    {
+      "username": "ops@acme",
+      "email": "ops@acme.test",
+      "firstName": "Omar",
+      "lastName": "Ops",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "ops_exec"
+        ]
+      }
+    },
+    {
+      "username": "lead@acme",
+      "email": "lead@acme.test",
+      "firstName": "Lena",
+      "lastName": "Lead",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "ops_lead"
+        ]
+      }
+    },
+    {
+      "username": "fin@acme",
+      "email": "fin@acme.test",
+      "firstName": "Femi",
+      "lastName": "Finance",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "finance"
+        ]
+      }
+    },
+    {
+      "username": "ctrl@acme",
+      "email": "ctrl@acme.test",
+      "firstName": "Cora",
+      "lastName": "Controller",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "controller"
+        ]
+      }
+    },
+    {
+      "username": "audit@acme",
+      "email": "audit@acme.test",
+      "firstName": "Arun",
+      "lastName": "Auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "auditor"
+        ]
+      }
+    },
+    {
+      "username": "admin@acme",
+      "email": "admin@acme.test",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "tenant_admin"
+        ]
+      }
+    },
+    {
+      "username": "ops@bolt",
+      "email": "ops@bolt.test",
+      "firstName": "Bo",
+      "lastName": "Bolt",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "ops_exec"
+        ]
+      }
+    },
+    {
+      "username": "platform",
+      "email": "platform@nova.test",
+      "firstName": "Pat",
+      "lastName": "Platform",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "platform_admin"
+        ]
+      }
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Acme Logistics",
+      "alias": "acme",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "acme.test",
+          "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "fde@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "ops@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "lead@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "fin@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "ctrl@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "audit@acme",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "admin@acme",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    },
+    {
+      "name": "Bolt Freight",
+      "alias": "bolt",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "bolt.test",
+          "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "ops@bolt",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    }
+  ]
+}

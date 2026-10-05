@@ -17,13 +17,14 @@ A working prototype of Nova's four pillars. The JD lists them as Workflow Orches
 | LLM provider | **OpenRouter via LiteLLM gateway** | One egress point. Model *aliases* in LiteLLM let us swap models without code changes. |
 | Quick decisions | **Jev** (`typesafe/jev-1.13` on OpenRouter) | Becomes a first-class `decide` node type in the DSL: cheap, ~300 ms–2 s structured yes/no decisions for routing and triage. |
 | Sample data | **Synthetic**, generated, with planted errors | Seed generator produces BoL/invoice PDFs, POs, rate contracts, and a shipment event stream. The errors are known, so every validator has something to catch. |
+| Auth (added 2026-10-05) | **Keycloak** (OIDC, one realm, Organization per tenant) + **RBAC** with 9 roles enforced in OpenFGA | Replaces the seeded JWT. Next.js becomes an OIDC BFF; OpenFGA holds the role → capability matrix; roles come from the token as contextual tuples ([ADR-018–020](06-adrs.md#adr-018-keycloak-for-authentication-one-realm-one-organization-per-tenant)) |
 | Diagrams | archify skill (installed globally) | Diagrams go in `docs/diagrams/` as standalone interactive HTML. |
 
 ## 3. How each JD technology lands in the prototype
 
 | Tech | Runs? | Role in prototype |
 |---|---|---|
-| React + React Flow | ✅ | Workflow Studio (graph ↔ YAML), live run view, task inbox |
+| Next.js + React Flow | ✅ | Next.js App Router web app (ADR-017): Workflow Studio (graph ↔ YAML), live run view, task inbox |
 | Python + FastAPI | ✅ | `nova-api` plus the worker processes |
 | Postgres | ✅ | System of record, plus the Temporal / OpenFGA / LiteLLM / Langfuse metadata DBs |
 | Temporal | ✅ | Durable execution for every workflow run (JD says "scheduling"; we use it for both scheduling and long-running human waits) |
@@ -32,7 +33,8 @@ A working prototype of Nova's four pillars. The JD lists them as Workflow Orches
 | OpenRouter + Jev | ✅ | Model provider; Jev for `decide` nodes |
 | Langfuse | ✅ | LLM traces, cost, and evals; every agent run links to its trace |
 | OpenTelemetry | ✅ | API + workers export traces; Temporal interceptors propagate context |
-| OpenFGA | ✅ | Relationship authz, including approval limits via conditions |
+| Keycloak | ✅ | OIDC login, tenant Organizations, roles, MFA, sessions; realm as code |
+| OpenFGA | ✅ | Every authz decision: RBAC capability matrix + relationships + approval limits via conditions |
 | Kafka | ✅ | `shipment.events`, CDC topics, `nova.outbox` |
 | Debezium | ✅ | Postgres CDC (outbox + selected tables) → Kafka |
 | ClickHouse | ✅ | Analytical store; also Langfuse v3's backing store (shared instance, separate DB) |
@@ -81,6 +83,7 @@ Sources: [Pallet competitor map](https://yespress.io/pallet/who-competes-with-pa
 | Q5 | LLM spend | **Resolved.** Spend as little as possible: three LLM modes with local Ollama models, response caching and hard budget caps. See §6.3. |
 | Q6 | Docker on Windows: WSL2 memory | **Resolved.** 32 GB machine. `.wslconfig` `memory=24GB`, `processors=8`, `swap=8GB`. Budget in [HLD §7](02-hld.md#7-deployment-prototype). |
 | Q7 | Real GoComet integrations | Out of scope; the simulator emits GoComet-shaped events. |
+| Q8 | Authentication and roles | **Resolved 2026-10-05.** Keycloak + RBAC (see clarifications). Still open: per-client IdP federation (designed, stretch) and multi-org users such as FDEs serving several clients (org-scoped groups, later). |
 
 ### 6.1 Embeddings: decision details
 

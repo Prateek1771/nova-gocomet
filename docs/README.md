@@ -16,11 +16,12 @@ Nova is GoComet's governed AI platform for enterprise logistics. This repo build
 | 07 | [Implementation plan](07-build-plan.md) | Phased plan M0–M7: tasks, tests, exit criteria, DoD, traceability |
 | 08 | [Enterprise execution plan](08-enterprise-execution-plan.md) | note.md plan → deliverables; security, AI governance, CI/CD, environments, SLOs, DR, client onboarding |
 | 09 | [Standard domain model](09-standard-domain-model.md) | Generic engine vs per-process config, entities, run lifecycle, 5 process patterns |
+| 10 | [Implementation checklist](10-implementation-checklist.md) | Full capability checklist by area (incl. CI), tagged to M0–M7 |
 | — | [diagrams/](diagrams/) | Interactive architecture diagrams (archify) |
 
 ## One-paragraph architecture
 
-React + React Flow front end → FastAPI (`nova-api`) → **Temporal** runs every workflow through one generic interpreter that reads the YAML definition → each step is an activity: a **LangGraph** agent, a **Jev** quick decision, a CEL rule, or a human task that waits on a Temporal signal → all LLM traffic goes out through **LiteLLM → OpenRouter** with per-tenant budgets and **Langfuse** tracing → **Postgres** is the system of record (RLS per tenant), **Debezium** streams its changes and shipment events through **Kafka** into **ClickHouse** for analytics, **Weaviate** holds SOP and contract embeddings, **OpenFGA** decides who can approve what.
+Next.js (App Router) + React Flow front end with **Keycloak** login (OIDC BFF, org per tenant) → FastAPI (`nova-api`) → **Temporal** runs every workflow through one generic interpreter that reads the YAML definition → each step is an activity: a **LangGraph** agent, a **Jev** quick decision, a CEL rule, or a human task that waits on a Temporal signal → all LLM traffic goes out through **LiteLLM → OpenRouter** with per-tenant budgets and **Langfuse** tracing → **Postgres** is the system of record (RLS per tenant), **Debezium** streams its changes and shipment events through **Kafka** into **ClickHouse** for analytics, **Weaviate** holds SOP and contract embeddings, **OpenFGA** makes every RBAC/ReBAC decision (who can approve what, and up to how much).
 
 ## Diagrams (open in a browser)
 

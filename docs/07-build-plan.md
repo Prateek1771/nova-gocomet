@@ -1,7 +1,7 @@
 # 07 — Implementation Plan
 
 **Status:** implementation baseline, design phase complete.
-**Purpose:** the delivery plan for the prototype. Each milestone has a goal, tasks, tests and exit criteria, all traceable to the [PRD](01-prd.md), the [LLD](03-lld.md), the [workflow specs](04-workflow-specs.md) and the [domain model](09-standard-domain-model.md). The enterprise gates from [08](08-enterprise-execution-plan.md) are folded into each milestone's exit criteria, so "done" is defined in one place.
+**Purpose:** the delivery plan for the prototype. Each milestone has a goal, tasks, tests and exit criteria, all traceable to the [PRD](01-prd.md), the [LLD](03-lld.md), the [workflow specs](04-workflow-specs.md) and the [domain model](09-standard-domain-model.md). The enterprise gates from [08](08-enterprise-execution-plan.md) are folded into each milestone's exit criteria, so "done" is defined in one place. The full capability checklist by area, including the CI pipeline, is [10-implementation-checklist](10-implementation-checklist.md).
 
 ---
 
@@ -62,24 +62,28 @@
 **Goal:** a reproducible environment that a newcomer can start from the README.
 
 ### Tasks
-- [ ] uv workspace (`packages/*`, `services/*`, `src/` layout) + pnpm `apps/web` (Vite, React 19, TS).
-- [ ] `infra/docker-compose.yml` `core` profile: postgres, redis, minio, temporal + ui, openfga, litellm, ollama, api, engine-worker, agents-worker, web.
-- [ ] `infra/postgres/init/*.sql`: DBs for nova/temporal/openfga/litellm/langfuse; `nova_app` non-owner role; RLS on.
-- [ ] Alembic baseline migration (incl. Phase 0 deltas).
-- [ ] `nova_core`: settings (`pydantic-settings`), async SQLAlchemy, tenancy context (`SET app.tenant_id`), structured JSON logging with `tenant_id`/`run_id`/`trace_id`, OTel bootstrap.
-- [ ] FastAPI app: `/healthz`, `/readyz`, request ID, error envelope, OpenAPI → generated TS client.
-- [ ] `/auth/token` with seeded users → JWT (`sub`, `tenant_id`).
-- [ ] Makefile: `up`, `down`, `seed`, `test`, `lint`.
-- [ ] `.env.example`, `.wslconfig` note in README.
-- [ ] Pre-commit: ruff, mypy, eslint, prettier, gitleaks.
-- [ ] CI: lint, type check, unit tests, import-linter contracts, Syft SBOM.
+- [x] uv workspace (`packages/*`, `services/*`, `src/` layout) + pnpm `apps/web` (Next.js App Router, React 19, TS, `output: 'standalone'`, OIDC BFF route handlers, `/api/v1/[...path]` proxy, `proxy.ts` guard).
+- [x] `infra/docker-compose.yml` `core` profile, M0 slice: postgres, redis, keycloak, migrate (Alembic + seed), api, web. Each remaining service joins when its first user lands: temporal + ui and engine-worker in M1, minio in M2, agents-worker and litellm/ollama (`ai`) in M2, openfga in M4. Host ports: web 3300, api 8100, keycloak 8180, postgres 5433.
+- [x] `infra/postgres/init/*.sql`: DBs nova + keycloak, `nova_owner` / `nova_app` (non-owner) roles. The temporal/openfga/litellm/langfuse DBs are added with their services.
+- [x] Alembic baseline migration (incl. Phase 0 deltas), RLS + `FORCE` on every tenant table; master-data tables follow in M2/M5.
+- [x] `nova_core`: settings (`pydantic-settings`), async SQLAlchemy, tenancy context (`SET app.tenant_id`), structured JSON logging with `tenant_id`/`run_id`/`trace_id`, OTel bootstrap.
+- [x] FastAPI app: `/healthz`, `/readyz`, request ID, error envelope, OpenAPI at `/api/openapi.json`.
+- [ ] OpenAPI → generated TS client (M1, when there are routes to call from client islands).
+- [x] Keycloak in `core` with `infra/keycloak/realm-nova.json` (realm `nova`, clients, 9 roles, orgs Acme + Bolt, dev users) (FR-X.4).
+- [x] Next.js BFF: `openid-client` login/callback/logout, Redis session, bearer-attaching `/api/v1` proxy.
+- [x] FastAPI JWKS validation → principal (`sub`, `tenant_id`, roles); `GET /me`.
+- [x] Makefile: `up`, `down`, `seed`, `test`, `test-int`, `lint`, `ci`.
+- [x] `.env.example`, `.wslconfig` note in README.
+- [x] Pre-commit: ruff, mypy, eslint + tsc, gitleaks (prettier skipped; eslint covers the web app).
+- [x] CI: lint, type check, unit tests, import-linter contracts, integration (RLS + Keycloak), Trivy, Syft SBOM, docs lint.
 
 ### Tests
-- [ ] RLS smoke: a query as tenant A over tenant B rows returns 0.
+- [x] RLS smoke: a query as tenant A over tenant B rows returns 0 (`tests/integration/test_rls.py`).
+- [x] Token validation: unit (`tests/unit/test_auth.py`) + real Keycloak realm (`tests/integration/test_keycloak.py`).
 - [ ] Health endpoints in CI via compose.
 
 ### Exit criteria
-- [ ] `make up` → all core containers healthy; web shows login.
+- [x] `make up` → all core containers healthy; web shows login.
 - [ ] CI stages live; import-linter contracts enforced; SBOM produced.
 
 ---
@@ -150,13 +154,14 @@
 **Goal:** model a process visually, publish it, watch it run.
 
 ### Tasks
-- [ ] React Flow canvas + elkjs layout; Monaco + `monaco-yaml` with the DSL schema.
+- [ ] React Flow canvas + elkjs layout as a `next/dynamic` client island; Monaco + `monaco-yaml` with the DSL schema.
 - [ ] Graph edits = targeted `yaml` Document mutations keyed by node id; `layout:` block for positions.
 - [ ] Node palettes from `/catalog/agents`, `/catalog/actions`; side-panel node config.
 - [ ] Validation badges from `/workflows/{key}/validate`; publish → new version (FR-1.3).
 - [ ] Live run view: same graph, per-node status via SSE, step inspector, Langfuse trace links (FR-1.7).
 
 ### Tests
+- [ ] SSE through the Next.js `/api/v1` proxy delivers events < 1 s.
 - [ ] YAML round-trip property test: random graph ops keep comments and leave unrelated lines byte-identical.
 - [ ] Invalid YAML keeps the last valid graph and shows markers.
 - [ ] axe a11y check on studio and inbox.
@@ -171,7 +176,9 @@
 **Goal:** tenancy, authority, budgets and tracing, all provable.
 
 ### Tasks
-- [ ] OpenFGA model + seed tuples for Acme and Bolt; `within_limit` per user.
+- [ ] OpenFGA model with the RBAC capability matrix ([LLD §7](03-lld.md#7-authorization-openfga)); `require(capability, object)` on every route with contextual role tuples (FR-X.5).
+- [ ] Engine writes assignee/approver tuples; approver limits from `TenantConfig.approval_limits`.
+- [ ] Keycloak MFA policy for privileged roles (staging realm); login/admin events on.
 - [ ] Inbox via `ListObjects`; `can_complete` checked on `/tasks/{id}/complete` (FR-1.5).
 - [ ] Second tenant (Bolt) with diverging YAML + TenantConfig (FR-X.2).
 - [ ] LiteLLM virtual key per tenant; budget-exhausted → `needs_attention` human task.
@@ -180,7 +187,8 @@
 
 ### Tests
 - [ ] Cross-tenant suite: Postgres, MinIO, Weaviate, FGA (ClickHouse is added in M6).
-- [ ] Authz matrix: every role × action.
+- [ ] RBAC matrix: every role × capability against the allow/deny table in LLD §7, incl. `platform_admin` has no tenant data access.
+- [ ] Token tests: wrong `aud`/`iss`, expired, missing org, tampered signature → 401.
 - [ ] Audit chain verification job.
 
 ### Exit criteria
@@ -375,6 +383,8 @@ Status:      Not started | In progress | Review | Done
 | FR-X.1 audit | M1 (entries), M4 (hash chain) |
 | FR-X.2 two tenants | M4 |
 | FR-X.3 one-command bring-up | M0, M7 |
+| FR-X.4 Keycloak login + MFA | M0 (login), M4 (MFA policy) |
+| FR-X.5 RBAC via OpenFGA | M4 |
 
 ---
 

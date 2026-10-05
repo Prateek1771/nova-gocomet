@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+# dev-only, committed on purpose: realm-as-code dev clients/users (never used outside local/CI)
+[[allowlists]]
+description = "dev realm + compose secrets"
+paths = ['''infra/keycloak/realm-nova\.json''', '''infra/docker-compose\.yml''', '''\.env\.example''']
