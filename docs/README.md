@@ -2,7 +2,7 @@
 
 Nova is GoComet's governed AI platform for enterprise logistics. This repo builds a working prototype of it: a generic, YAML-driven workflow engine with a visual editor, a governed agent pipeline, a micro-app layer for human steps, and a tenant-isolated data layer, demonstrated end-to-end on three real logistics workflows.
 
-**Status:** design phase. No code yet.
+**Status:** building milestone by milestone against [07](07-build-plan.md); M0 and M1 are done.
 
 | # | Doc | What it answers |
 |---|-----|-----------------|
@@ -17,6 +17,7 @@ Nova is GoComet's governed AI platform for enterprise logistics. This repo build
 | 08 | [Enterprise execution plan](08-enterprise-execution-plan.md) | note.md plan → deliverables; security, AI governance, CI/CD, environments, SLOs, DR, client onboarding |
 | 09 | [Standard domain model](09-standard-domain-model.md) | Generic engine vs per-process config, entities, run lifecycle, 5 process patterns |
 | 10 | [Implementation checklist](10-implementation-checklist.md) | Full capability checklist by area (incl. CI), tagged to M0–M7 |
+| — | [testing/m1-manual-test.md](testing/m1-manual-test.md) | Step-by-step manual test guide for M1 (DSL + engine) |
 | — | [diagrams/](diagrams/) | Interactive architecture diagrams (archify) |
 
 ## One-paragraph architecture
