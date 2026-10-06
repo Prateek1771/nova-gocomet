@@ -2,9 +2,9 @@
 # lines below directly.
 COMPOSE = docker compose -f infra/docker-compose.yml --profile core
 
-.PHONY: up down logs seed test test-int lint fmt ci
+.PHONY: up down logs seed test test-int lint fmt gen ci
 
-up:            ## core stack: postgres, redis, keycloak, api (+migrate/seed), web
+up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
 
 down:
@@ -16,11 +16,13 @@ logs:
 seed:          ## re-run migrations + seed against the running stack
 	$(COMPOSE) run --rm migrate
 
-test:          ## unit tests (no Docker)
+test:          ## unit + engine (Temporal time-skipping) tests, no Docker
 	uv run pytest tests/unit
+	uv run coverage run -m pytest tests/engine
+	uv run coverage report
 	pnpm -C apps/web test
 
-test-int:      ## testcontainers: Postgres RLS + Keycloak realm
+test-int:      ## testcontainers: Postgres (RLS, engine + API) + Keycloak realm
 	uv run pytest tests/integration
 
 lint:
@@ -30,6 +32,11 @@ lint:
 	uv run lint-imports
 	pnpm -C apps/web lint
 	pnpm -C apps/web typecheck
+
+gen:           ## regenerate DSL JSON Schema, OpenAPI and the web TS types
+	uv run python -m nova_dsl.schema
+	uv run python -m nova_api.openapi
+	pnpm -C apps/web gen
 
 fmt:
 	uv run ruff check --fix .

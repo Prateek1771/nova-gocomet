@@ -206,7 +206,7 @@ Docker Compose, three profiles plus local LLMs. Target machine: 32 GB RAM, 4C/8T
 | local LLMs (`LLM_MODE=local\|cheap`) | Ollama keeps at most 2 models loaded, e.g. qwen2.5:7b + gemma3:4b | +6–9 GB |
 | **full + local LLMs** | | **~18–21 GB** → fits in the 24 GB WSL cap |
 
-The table is the M7 target. `core` grows one milestone at a time; [07 M0](07-build-plan.md#m0--skeleton) lists the current slice.
+The table is the M7 target. `core` grows one milestone at a time; [07 M0](07-build-plan.md#m0--skeleton) lists the current slice. Since M1, Temporal runs as the single-container dev server (SQLite volume, UI built in on :8233, namespace `default`) instead of server + temporal-ui on Postgres; the `nova` namespace and `tenant_id` search attribute arrive with the Postgres-backed server if load or HA ever need it.
 
 `make up` = core (workflows 1 & 2 run; agent tracing logs locally). `make up-full` = everything (adds workflow 3, Langfuse, and SOP retrieval). `make up-local` = everything + `LLM_MODE=local`: $0 and offline, but CPU-only, so a BoL run takes ~2–4 min (see [brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)).
 

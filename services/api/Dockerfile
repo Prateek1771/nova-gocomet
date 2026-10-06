@@ -11,7 +11,8 @@ FROM python:3.13-slim-bookworm
 RUN useradd --system --uid 10001 nova
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/services/api/alembic.ini /app/alembic.ini
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1
+COPY definitions /app/definitions
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 DEFINITIONS_DIR=/app/definitions
 WORKDIR /app
 USER nova
 EXPOSE 8000

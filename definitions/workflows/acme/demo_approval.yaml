@@ -1,0 +1,42 @@
+# Generic approval: small amounts auto-approve, the rest go to a human with an SLA.
+# Threshold lives in TenantConfig (`tenant.auto_approve_below`), never here (CLAUDE.md rule 2).
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: demo_approval
+  title: Demo approval
+trigger: {type: manual}
+inputs:
+  amount: {type: number}
+  note: {type: string}
+nodes:
+  - id: route
+    type: rule
+    cases:
+      - when: "double(input.amount) < double(tenant.auto_approve_below)"
+        goto: notify
+    default: review
+  - id: review
+    type: human_task
+    title: "Approve ${{ input.amount }} — ${{ input.note ?? 'no note' }}"
+    assignee: {role: ops_lead}
+    app: generic_review
+    sla: 2m
+    escalate: {after: 2m, to: {role: finance}}
+    outputs: [approved, rejected]
+    with: {amount: "${{ input.amount }}"}
+  - id: notify
+    type: action
+    action: notify.log
+    with:
+      message: "approved ${{ input.amount }}"
+      by: "${{ nodes.review.output.by ?? 'auto' }}"
+  - id: done
+    type: end
+  - id: declined
+    type: end
+    status: rejected
+edges:
+  - {from: review, to: notify, on: approved}
+  - {from: review, to: declined, on: rejected}
+  - {from: notify, to: done}

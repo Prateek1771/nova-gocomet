@@ -1,0 +1,11 @@
+metadata: {key: t}
+nodes:
+  - {id: start, type: action, action: noop}
+  - {id: r, type: rule, cases: [{when: "true", goto: loop}], default: done}
+  - {id: loop, type: action, action: noop}
+  - {id: loop2, type: action, action: noop}
+  - {id: done, type: end}
+edges:
+  - {from: start, to: r}
+  - {from: loop, to: loop2}
+  - {from: loop2, to: loop}

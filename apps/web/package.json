@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:dsl": "json2ts -i ../../packages/nova_dsl/schema/workflow.schema.json -o src/dsl/workflow.ts --bannerComment \"// Generated from nova_dsl (pnpm gen:dsl). Do not edit.\"",
+    "gen:api": "openapi-typescript ../../services/api/openapi.json -o src/lib/api-types.ts",
+    "gen": "pnpm gen:dsl && pnpm gen:api"
   },
   "dependencies": {
     "ioredis": "^6.0.0",
@@ -24,6 +27,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "json-schema-to-typescript": "^16.0.0",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.3"

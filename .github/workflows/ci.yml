@@ -1,4 +1,4 @@
-# docs/10 Phase 2 — M0 jobs. Later milestones add definitions, contracts, workflow-tests, ai-recorded.
+# docs/10 Phase 2 — M0 + M1 jobs. Later milestones add definitions, contracts, workflow-tests, ai-recorded.
 # ponytail: actions pinned to major tags for now; Renovate (Phase 2 task) pins them to SHAs.
 name: ci
 
@@ -29,7 +29,7 @@ jobs:
         with:
           filters: |
             python: ['packages/**', 'services/**', 'tests/**', 'pyproject.toml', 'uv.lock']
-            web: ['apps/web/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json']
+            web: ['apps/web/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'packages/nova_dsl/schema/**', 'services/api/openapi.json']
             infra: ['infra/**', '**/Dockerfile', '.github/workflows/**']
 
   python:
@@ -46,9 +46,15 @@ jobs:
       - run: uv run mypy
       - run: uv run lint-imports
       - run: uv run pytest tests/unit --junitxml=junit-unit.xml
+      # Temporal time-skipping tests; 100% branch coverage gate on the interpreter + handlers
+      - run: uv run coverage run -m pytest tests/engine --junitxml=junit-engine.xml && uv run coverage report
+      - name: Generated schemas are committed (DSL JSON Schema, OpenAPI)
+        run: |
+          uv run python -m nova_dsl.schema && uv run python -m nova_api.openapi
+          git diff --exit-code -- packages/nova_dsl/schema services/api/openapi.json
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: junit-unit, path: junit-unit.xml }
+        with: { name: junit-unit, path: "junit-*.xml" }
 
   web:
     needs: changes
@@ -63,6 +69,8 @@ jobs:
       - run: pnpm -C apps/web lint
       - run: pnpm -C apps/web typecheck
       - run: pnpm -C apps/web test
+      - name: TS types match the DSL schema and OpenAPI
+        run: pnpm -C apps/web gen && git diff --exit-code -- apps/web/src/dsl apps/web/src/lib/api-types.ts
       - uses: actions/cache@v4
         with:
           path: apps/web/.next/cache
@@ -81,7 +89,7 @@ jobs:
       - run: uv sync --frozen
       - name: OpenFGA model validates
         run: docker run --rm -v "$PWD/infra/openfga:/m:ro" openfga/cli model validate --file /m/model.fga | tee /dev/stderr | grep -q '"is_valid":true'
-      # testcontainers: Postgres (RLS cross-tenant) + Keycloak (realm import, token flows)
+      # testcontainers Postgres (RLS, engine + API on Temporal's test server) + Keycloak (realm, tokens)
       - run: uv run pytest tests/integration --junitxml=junit-int.xml
       - uses: actions/upload-artifact@v4
         if: always()
@@ -112,6 +120,7 @@ jobs:
       matrix:
         include:
           - { name: api, dockerfile: services/api/Dockerfile }
+          - { name: engine, dockerfile: services/engine/Dockerfile }
           - { name: web, dockerfile: apps/web/Dockerfile }
     steps:
       - uses: actions/checkout@v4

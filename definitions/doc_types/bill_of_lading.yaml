@@ -1,0 +1,6 @@
+key: bill_of_lading
+schema: bol_v1                     # → definitions/schemas/bol_v1.json (M2)
+checks: [CNTR_CHECK_DIGIT, LOCODE_UNKNOWN, BOOKING_MISMATCH, WEIGHT_SUM, DATE_ORDER, HS_FORMAT, SEMANTIC_GOODS]
+default_workflow: bol_intake       # what a document_upload trigger starts
+classifier_hints: ["BILL OF LADING", "B/L No", "Shipped on board"]
+retention: 7y

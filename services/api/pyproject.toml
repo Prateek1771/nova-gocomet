@@ -2,10 +2,11 @@
 name = "nova-api"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = ["nova-core", "fastapi>=0.115", "uvicorn[standard]>=0.32", "alembic>=1.14", "httpx>=0.27"]
+dependencies = ["nova-core", "nova-dsl", "fastapi>=0.115", "uvicorn[standard]>=0.32", "alembic>=1.14", "httpx>=0.27"]
 
 [tool.uv.sources]
 nova-core = { workspace = true }
+nova-dsl = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

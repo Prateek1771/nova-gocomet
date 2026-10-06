@@ -1,0 +1,3 @@
+metadata: {key: t}
+nodes:
+  - {id: a, type: teleport}

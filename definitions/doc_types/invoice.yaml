@@ -1,0 +1,6 @@
+key: invoice
+schema: invoice_v1
+checks: []                         # W2 check codes land with invoice_matcher (M5)
+default_workflow: invoice_match
+classifier_hints: ["INVOICE", "Invoice No", "Amount Due"]
+retention: 10y

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     oidc_audience: str = "nova-api"
     oidc_azp: str = "nova-web"
     openfga_url: str = "http://localhost:8081"
+    temporal_host: str = "localhost:7233"
     otel_exporter_otlp_endpoint: str = ""
     log_level: str = "INFO"
 

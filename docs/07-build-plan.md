@@ -68,7 +68,7 @@
 - [x] Alembic baseline migration (incl. Phase 0 deltas), RLS + `FORCE` on every tenant table; master-data tables follow in M2/M5.
 - [x] `nova_core`: settings (`pydantic-settings`), async SQLAlchemy, tenancy context (`SET app.tenant_id`), structured JSON logging with `tenant_id`/`run_id`/`trace_id`, OTel bootstrap.
 - [x] FastAPI app: `/healthz`, `/readyz`, request ID, error envelope, OpenAPI at `/api/openapi.json`.
-- [ ] OpenAPI → generated TS client (M1, when there are routes to call from client islands).
+- [x] OpenAPI → generated TS types (done in M1).
 - [x] Keycloak in `core` with `infra/keycloak/realm-nova.json` (realm `nova`, clients, 9 roles, orgs Acme + Bolt, dev users) (FR-X.4).
 - [x] Next.js BFF: `openid-client` login/callback/logout, Redis session, bearer-attaching `/api/v1` proxy.
 - [x] FastAPI JWKS validation → principal (`sub`, `tenant_id`, roles); `GET /me`.
@@ -93,28 +93,34 @@
 **Goal:** the definition system and the generic interpreter, before any workflow-specific screen ([09 §13](09-standard-domain-model.md#13-implementation-principle)).
 
 ### Tasks
-- [ ] `nova_dsl`: Pydantic models for every node type → JSON Schema export → TS types.
-- [ ] Graph validator: reachability, no dangling edges, all branches terminate, unique ids (FR-1.6).
-- [ ] CEL compile at publish; compiled AST cached per version.
-- [ ] Registries: node handlers, actions, checks, agents, micro-app components (decorator-based).
-- [ ] DocType loader (`definitions/doc_types/*.yaml`) + schema registry.
-- [ ] TenantConfig publish → new version; `load_definition` returns `(definition, config)` snapshot.
-- [ ] `NovaWorkflow`: `rule`, `human_task` (signal + SLA timer + escalate), `action`, `parallel`, `wait`, `subflow`, `end`; `continue_as_new` over 1,000 events.
-- [ ] `_project` → `run_steps` + `workflow_runs.status` per [09 §7](09-standard-domain-model.md#7-standard-run-lifecycle).
-- [ ] `action_executions` idempotency wrapper for every action.
-- [ ] API: workflows CRUD, validate, publish, versions; runs start/get/cancel; tasks claim/complete → signal.
-- [ ] **Spike:** `data` profile (Kafka + Debezium + ClickHouse) up on WSL2.
+- [x] `nova_dsl`: Pydantic models for every node type → JSON Schema export (`packages/nova_dsl/schema/`) → TS types (`apps/web/src/dsl/`, `pnpm gen:dsl`).
+- [x] Graph validator: reachability, no dangling edges, all branches terminate, unique ids, output coverage, CEL + node-reference checks (FR-1.6).
+- [x] CEL compile at publish; compiled programs cached per expression (definitions are immutable per version).
+- [x] Registries: node handlers and actions (`nova_core.registry`, decorator-based). Checks registry lands with the first check code (M2); micro-app components with the Inbox (M2); agents with agents-worker (M2).
+- [x] DocType loader (`definitions/doc_types/*.yaml`). Extraction-schema registry lands with `bol_v1` (M2).
+- [x] TenantConfig publish → new version (`PUT /tenant-config`); `load_definition` returns `(definition, config)` snapshot.
+- [x] `NovaWorkflow`: `rule`, `human_task` (update + SLA timer + escalate), `action`, `parallel`, `wait`, `subflow`, `end` (+ `agent` / `decide` activity stubs on `nova-agents`); `continue_as_new` over 1,000 events; failed step → `needs_attention` task (retry / abort).
+- [x] `_project` → `run_steps` + `workflow_runs.status` + `audit_log` per [09 §7](09-standard-domain-model.md#7-standard-run-lifecycle).
+- [x] `action_executions` idempotency wrapper for every action.
+- [x] API: workflows CRUD, validate, publish, versions; runs start/get/cancel; tasks claim/complete → workflow update (validated). AuthZ goes through one `authorize()` seam (tenant scope now, OpenFGA in M4).
+- [x] OpenAPI → generated TS types (`apps/web/src/lib/api-types.ts`, `pnpm gen:api`); closes the M0 item.
+- [x] Temporal in `core` as the dev server (SQLite volume, UI on <http://localhost:8233>) + `engine` worker. ponytail: Postgres-backed server only if load or HA matter.
+- [x] **Spike:** `data` profile works on Docker Desktop / WSL2 (2026-10-06). Kafka 3.9 KRaft + Debezium Connect 3.0 + ClickHouse 25.8 use ~1.2 GB together. An `outbox` insert reaches `nova.outbox.run` via the EventRouter SMT (`infra/kafka-connect/debezium-nova.json`), with `id`, `tenant_id` and `type` as headers; ClickHouse answers on host port 8124 (8123 clashes with Langfuse). Findings for M6:
+  - Postgres needs `wal_level=logical` (now set in compose).
+  - Debezium connects as `postgres` for the spike; give it a dedicated `REPLICATION` role.
+  - The message key is the aggregate *type*. LLD §6 wants the aggregate id, so `outbox` needs an `aggregate_id` column.
+  - Register the connector with `curl -X POST -H "Content-Type: application/json" --data @infra/kafka-connect/debezium-nova.json localhost:8083/connectors`.
 
 ### Tests
-- [ ] Property tests for the graph validator; golden YAML fixtures (valid + each invalid class).
-- [ ] Temporal time-skipping tests: branching, SLA escalation, signal resume, `continue_as_new`, cancel.
-- [ ] Idempotency: replaying an action activity produces one `action_executions` row.
-- [ ] Config pinning: editing TenantConfig mid-run doesn't change that run's routing.
+- [x] Property tests for the graph validator (Hypothesis); golden YAML fixtures (valid + one per invalid code) (`tests/unit/test_dsl.py`).
+- [x] Temporal time-skipping tests: branching, SLA escalation, update resume, `continue_as_new`, cancel, parallel all/any, events, subflow, needs-attention (`tests/engine/`).
+- [x] Idempotency: replaying an action activity produces one `action_executions` row (`tests/integration/test_engine_db.py`).
+- [x] Config pinning: editing TenantConfig mid-run doesn't change that run's routing (same file).
 
 ### Exit criteria
-- [ ] A YAML with a human task runs, waits, resumes on signal and escalates on SLA in tests.
-- [ ] 100% branch coverage across node types; DSL schema ↔ TS types sync check in CI.
-- [ ] Data-profile spike result recorded (works / workaround).
+- [x] A YAML with a human task runs, waits, resumes on signal and escalates on SLA in tests.
+- [x] 100% branch coverage across node types (`make test` gate); DSL schema ↔ TS types sync check in CI.
+- [x] Data-profile spike result recorded (works; findings in the task above).
 
 ---
 

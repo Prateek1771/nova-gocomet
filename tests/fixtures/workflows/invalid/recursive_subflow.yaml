@@ -1,0 +1,6 @@
+metadata: {key: t}
+nodes:
+  - {id: s, type: subflow, workflow: t}
+  - {id: done, type: end}
+edges:
+  - {from: s, to: done}

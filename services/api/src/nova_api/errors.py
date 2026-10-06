@@ -44,3 +44,17 @@ def install(app: FastAPI) -> None:
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
         log.exception("unhandled", path=request.url.path)
         return envelope(request, 500, "internal", "internal error")
+
+
+class ApiError(Exception):
+    """Raise for errors that carry details (e.g. validation issues); plain HTTPException otherwise."""
+
+    def __init__(self, status: int, code: str, message: str, details: list[Any] | None = None) -> None:
+        super().__init__(message)
+        self.status, self.code, self.message, self.details = status, code, message, details or []
+
+
+def install_api_error(app: FastAPI) -> None:
+    @app.exception_handler(ApiError)
+    async def _api(request: Request, exc: ApiError) -> JSONResponse:
+        return envelope(request, exc.status, exc.code, exc.message, exc.details)

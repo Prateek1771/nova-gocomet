@@ -1,5 +1,5 @@
-# Nova local stack. `core` = what M0 runs; temporal (M1), minio (M2), openfga (M4) and the
-# data / ai profiles join as their milestones land. Host ports avoid the usual 3000/5432/8080 clashes.
+# Nova local stack. `core` = what runs today (M1: + temporal, engine); minio (M2), openfga (M4) and
+# the ai profile join as their milestones land. `data` = M1 spike (Kafka + Debezium + ClickHouse). Host ports avoid the usual 3000/5432/8080 clashes.
 name: nova
 
 x-api-env: &api-env
@@ -7,12 +7,14 @@ x-api-env: &api-env
   MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nova_owner:nova_owner@postgres:5432/nova
   KEYCLOAK_ISSUER: http://localhost:8180/realms/nova
   KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/nova/protocol/openid-connect/certs
+  TEMPORAL_HOST: temporal:7233
   ENV: dev
 
 services:
   postgres:
     image: postgres:17-alpine
     profiles: [core]
+    command: ["postgres", "-c", "wal_level=logical"]  # Debezium CDC (data profile)
     environment:
       POSTGRES_PASSWORD: postgres
     ports: ["127.0.0.1:5433:5432"]
@@ -59,6 +61,20 @@ services:
       start_period: 120s
       retries: 30
 
+  temporal:
+    # ponytail: dev server (SQLite file) instead of auto-setup + Postgres schema jobs; one container,
+    # durable across restarts. Move to the Postgres-backed server if load or HA ever matter.
+    image: temporalio/temporal:1.5.1
+    profiles: [core]
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/temporal.db", "--ui-port", "8233"]
+    ports: ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
+    volumes:
+      - temporaldata:/home/temporal  # existing dir owned by the image user (uid 1000)
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 5s
+      retries: 30
+
   migrate:
     image: nova-api:dev
     build: { context: .., dockerfile: services/api/Dockerfile }
@@ -76,6 +92,17 @@ services:
     ports: ["127.0.0.1:8100:8000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+
+  engine:
+    image: nova-engine:dev
+    build: { context: .., dockerfile: services/engine/Dockerfile }
+    profiles: [core]
+    environment: *api-env
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
 
   web:
     image: nova-web:dev
@@ -95,5 +122,58 @@ services:
       api: { condition: service_healthy }
       keycloak: { condition: service_healthy }
 
+  # --- data profile (M1 spike; M6 builds on it). Run with: --profile core --profile data ---
+  kafka:
+    image: apache/kafka:3.9.1
+    profiles: [data]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms256m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      retries: 20
+
+  connect:
+    image: quay.io/debezium/connect:3.0
+    profiles: [data]
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: nova-connect
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      HEAP_OPTS: -Xmx512m -Xms256m
+    ports: ["127.0.0.1:8083:8083"]
+    depends_on:
+      kafka: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    profiles: [data]
+    environment:
+      CLICKHOUSE_USER: nova
+      CLICKHOUSE_PASSWORD: nova
+    ports: ["127.0.0.1:8124:8123"]  # 8123 is often taken (Langfuse ClickHouse)
+    volumes:
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "nova", "--password", "nova", "-q", "select 1"]
+      interval: 10s
+      retries: 20
+
 volumes:
   pgdata:
+  temporaldata:
+  chdata:

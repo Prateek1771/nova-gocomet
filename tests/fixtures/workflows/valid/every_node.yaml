@@ -1,0 +1,55 @@
+# Exercises every node type; used by the DSL and engine tests.
+apiVersion: nova/v1
+kind: Workflow
+metadata: {key: every_node, title: Every node type}
+inputs: {amount: {type: number}}
+nodes:
+  - id: extract
+    type: agent
+    agent: doc_extractor
+    with: {document_id: "${{ input.document_id }}"}
+    retry: {max_attempts: 2}
+    timeout: 120s
+  - id: material
+    type: decide
+    questions:
+      - {id: blocking, ask: "Blocking?", context: "${{ nodes.extract.output }}"}
+  - id: fanout
+    type: parallel
+    join: all
+    branches: [[ping], [nap]]
+  - id: ping
+    type: action
+    action: noop
+  - id: nap
+    type: wait
+    duration: 1h
+  - id: child
+    type: subflow
+    workflow: demo_approval@1
+    with: {amount: "${{ input.amount }}"}
+  - id: route
+    type: rule
+    cases:
+      - {when: "nodes.material.output.blocking", goto: review}
+    default: done
+  - id: review
+    type: human_task
+    title: "Review ${{ input.amount }}"
+    assignee: {role: ops_exec}
+    app: generic_review
+    escalate: {after: 4h, to: {role: ops_lead}}
+  - id: done
+    type: end
+  - id: rejected
+    type: end
+    status: rejected
+edges:
+  - {from: extract, to: material}
+  - {from: material, to: fanout}
+  - {from: fanout, to: child}
+  - {from: child, to: route}
+  - {from: review, to: done, on: approved}
+  - {from: review, to: rejected, on: rejected}
+layout:
+  extract: {x: 0, y: 0}

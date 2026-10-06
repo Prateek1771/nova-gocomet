@@ -1,0 +1,8 @@
+metadata: {key: t}
+nodes:
+  - {id: a, type: action, action: noop}
+  - {id: b, type: action, action: noop}
+  - {id: done, type: end}
+edges:
+  - {from: a, to: done}
+  - {from: b, to: done}

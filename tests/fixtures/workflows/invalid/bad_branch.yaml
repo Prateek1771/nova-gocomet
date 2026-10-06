@@ -1,0 +1,7 @@
+metadata: {key: t}
+nodes:
+  - {id: p, type: parallel, branches: [[a], [done]]}
+  - {id: a, type: action, action: noop}
+  - {id: done, type: end}
+edges:
+  - {from: p, to: done}

@@ -1,0 +1,6 @@
+metadata: {key: t}
+nodes:
+  - {id: w, type: wait}
+  - {id: done, type: end}
+edges:
+  - {from: w, to: done}

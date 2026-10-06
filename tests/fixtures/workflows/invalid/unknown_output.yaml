@@ -1,0 +1,7 @@
+metadata: {key: t}
+nodes:
+  - {id: h, type: human_task, title: x, assignee: {role: ops_exec}, app: a, outputs: [approved]}
+  - {id: done, type: end}
+edges:
+  - {from: h, to: done, on: approved}
+  - {from: h, to: done, on: maybe}

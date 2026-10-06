@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from nova_api import errors
 from nova_api.deps import CallerDep
+from nova_api.routers import config, runs, tasks, workflows
 from nova_core import db
 from nova_core.logging import configure_logging
 from nova_core.settings import get_settings
@@ -19,6 +20,7 @@ configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
 
 app = FastAPI(title="Nova API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
 errors.install(app)
+errors.install_api_error(app)
 
 
 @app.middleware("http")
@@ -68,4 +70,6 @@ async def me(c: CallerDep) -> dict[str, Any]:
     return {"sub": p.sub, "email": p.email, "name": p.name, "tenant": tenant, "roles": sorted(p.roles)}
 
 
+for r in (workflows.router, runs.router, tasks.router, config.router):
+    v1.include_router(r)
 app.include_router(v1)

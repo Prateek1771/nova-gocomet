@@ -1,0 +1,13 @@
+[project]
+name = "nova-engine"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = ["nova-core", "nova-dsl", "temporalio>=1.9"]
+
+[tool.uv.sources]
+nova-core = { workspace = true }
+nova-dsl = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,4 @@
+metadata: {key: t}
+nodes:
+  - {id: r, type: rule, cases: [{when: "true", goto: ghost}], default: done}
+  - {id: done, type: end}
