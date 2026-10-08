@@ -1,9 +1,11 @@
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, FastAPI, Request, Response
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
 from nova_api import errors
@@ -16,11 +18,14 @@ from nova_core.telemetry import configure_tracing
 
 settings = get_settings()
 configure_logging(settings.log_level)
-configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
+tracing = configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
 
 app = FastAPI(title="Nova API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+if tracing:
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz")
 errors.install(app)
 errors.install_api_error(app)
+access_log = structlog.get_logger("access")
 
 
 @app.middleware("http")
@@ -29,8 +34,18 @@ async def request_id(request: Request, call_next: Callable[[Request], Awaitable[
     request.state.request_id = rid
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(request_id=rid)
+    t0 = time.perf_counter()
     response = await call_next(request)
     response.headers["x-request-id"] = rid
+    # JSON access log (uvicorn's text one is off); tenant_id is set by the auth dependency
+    access_log.info(
+        "request",
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        ms=round((time.perf_counter() - t0) * 1000, 1),
+        tenant_id=getattr(request.state, "tenant_id", None),
+    )
     return response
 
 

@@ -2,19 +2,21 @@
 stays the only writer of task status and validates the transition (09 §7)."""
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from temporalio.client import WorkflowUpdateFailedError
-from temporalio.service import RPCError
+from temporalio.client import RPCTimeoutOrCancelledError, WorkflowUpdateFailedError
+from temporalio.service import RPCError, RPCStatusCode
 
 from nova_api.authz import TenantDep, authorize
 from nova_core import db
 from nova_core import temporal as t
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+UPDATE_TIMEOUT = timedelta(seconds=10)
 
 
 class TaskOut(BaseModel):
@@ -83,17 +85,27 @@ async def _update(c: TenantDep, task_id: uuid.UUID, name: str, args: list[Any]) 
         ).scalar()
     if wf is None:
         raise HTTPException(404, "task not found")
-    try:
-        handle = (await t.client()).get_workflow_handle(wf)
-        await handle.execute_update(name, args=[str(task_id), c.sub, *args])
-    except WorkflowUpdateFailedError as e:
-        raise HTTPException(409, str(e.cause.message if hasattr(e.cause, "message") else e.cause)) from e
-    except RPCError as e:  # run already finished
-        raise HTTPException(409, f"task can't change: {e.message}") from e
+    await send_update(wf, name, [str(task_id), c.sub, *args])
     async with db.tenant_session(c.tenant_id) as s:
         q = text(f"select {_COLS} from human_tasks where id = :id")  # noqa: S608
         r = (await s.execute(q, {"id": task_id})).one()
     return _task(r)
+
+
+async def send_update(workflow_id: str, name: str, args: list[Any]) -> None:
+    """Workflow update, bounded: with no engine worker polling, the caller gets a 503 instead of a hang.
+    Retrying is safe: claim by the same user and a repeated complete are both rejected or no-ops."""
+    try:
+        handle = (await t.client()).get_workflow_handle(workflow_id)
+        await handle.execute_update(name, args=args, rpc_timeout=UPDATE_TIMEOUT)
+    except WorkflowUpdateFailedError as e:
+        raise HTTPException(409, str(e.cause.message if hasattr(e.cause, "message") else e.cause)) from e
+    except RPCTimeoutOrCancelledError as e:  # no worker accepted the update in time
+        raise HTTPException(503, "workflow engine unavailable; retry shortly") from e
+    except RPCError as e:
+        if e.status in (RPCStatusCode.DEADLINE_EXCEEDED, RPCStatusCode.UNAVAILABLE, RPCStatusCode.CANCELLED):
+            raise HTTPException(503, "workflow engine unavailable; retry shortly") from e
+        raise HTTPException(409, f"task can't change: {e.message}") from e  # run already finished
 
 
 @router.post("/{task_id}/claim")

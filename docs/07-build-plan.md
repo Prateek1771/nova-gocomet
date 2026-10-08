@@ -66,7 +66,7 @@
 - [x] `infra/docker-compose.yml` `core` profile, M0 slice: postgres, redis, keycloak, migrate (Alembic + seed), api, web. Each remaining service joins when its first user lands: temporal + ui and engine-worker in M1, minio in M2, agents-worker and litellm/ollama (`ai`) in M2, openfga in M4. Host ports: web 3300, api 8100, keycloak 8180, postgres 5433.
 - [x] `infra/postgres/init/*.sql`: DBs nova + keycloak, `nova_owner` / `nova_app` (non-owner) roles. The temporal/openfga/litellm/langfuse DBs are added with their services.
 - [x] Alembic baseline migration (incl. Phase 0 deltas), RLS + `FORCE` on every tenant table; master-data tables follow in M2/M5.
-- [x] `nova_core`: settings (`pydantic-settings`), async SQLAlchemy, tenancy context (`SET app.tenant_id`), structured JSON logging with `tenant_id`/`run_id`/`trace_id`, OTel bootstrap.
+- [x] `nova_core`: settings (`pydantic-settings`), async SQLAlchemy, tenancy context (`SET app.tenant_id`), structured JSON logging with `tenant_id`/`run_id`/`trace_id`, OTel bootstrap. Dev trace UI: Jaeger all-in-one on <http://localhost:16686> (FastAPI, asyncpg and Temporal spans; one trace covers API → workflow → activities) until the M4 collector + Langfuse take over.
 - [x] FastAPI app: `/healthz`, `/readyz`, request ID, error envelope, OpenAPI at `/api/openapi.json`.
 - [x] OpenAPI → generated TS types (done in M1).
 - [x] Keycloak in `core` with `infra/keycloak/realm-nova.json` (realm `nova`, clients, 9 roles, orgs Acme + Bolt, dev users) (FR-X.4).

@@ -8,6 +8,7 @@ x-api-env: &api-env
   KEYCLOAK_ISSUER: http://localhost:8180/realms/nova
   KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/nova/protocol/openid-connect/certs
   TEMPORAL_HOST: temporal:7233
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
   ENV: dev
 
 services:
@@ -74,6 +75,13 @@ services:
       test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
       interval: 5s
       retries: 30
+
+  jaeger:
+    # ponytail: Jaeger all-in-one (in-memory) as the dev trace UI on :16686. The OTel collector and
+    # Langfuse arrive with the ai profile in M4; services keep speaking plain OTLP either way.
+    image: jaegertracing/jaeger:2.11.0
+    profiles: [core]
+    ports: ["127.0.0.1:16686:16686"]
 
   migrate:
     image: nova-api:dev

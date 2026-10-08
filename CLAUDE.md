@@ -48,7 +48,7 @@ Next.js (App Router) + React 19 + React Flow + shadcn/Tailwind v4 · FastAPI · 
 
 `make up` (core stack) · `make down` · `make seed` · `make test` (unit + Temporal time-skipping engine tests, 100% branch gate) · `make test-int` (testcontainers) · `make lint` · `make gen` (DSL schema, OpenAPI, web TS types; CI fails on drift) · `make ci`. Coming later: `make up-full`, `make up-local`, `make demo`. No `make` on Windows: `winget install ezwinports.make`, or run the Makefile lines directly.
 
-Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Postgres 5433. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
+Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Jaeger traces <http://localhost:16686> · Postgres 5433. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
 
 ## Conventions
 

@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Annotated
 
 import structlog
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
 from starlette.concurrency import run_in_threadpool
@@ -28,19 +28,24 @@ def verifier() -> TokenVerifier:
 
 
 _bearer = HTTPBearer(auto_error=False)
+log = structlog.get_logger()
 
 
-async def caller(cred: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> Caller:
+async def caller(
+    request: Request, cred: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
+) -> Caller:
     if cred is None:
         raise HTTPException(401, "missing bearer token")
     try:
         p = await run_in_threadpool(verifier().verify, cred.credentials)  # JWKS fetch is blocking
     except AuthError as e:
-        raise HTTPException(401, f"invalid token: {e}") from e
+        log.info("token_rejected", reason=str(e))  # the detail stays server-side
+        raise HTTPException(401, "invalid token") from e
     if p.org_alias is None:
         return Caller(p, None, None)
     tenant_id = await _tenant_for(p)
     structlog.contextvars.bind_contextvars(tenant_id=str(tenant_id), sub=p.sub)
+    request.state.tenant_id = str(tenant_id)  # for the access log (middleware runs in another context)
     return Caller(p, tenant_id, p.org_alias)
 
 

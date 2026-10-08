@@ -6,15 +6,22 @@ from temporalio.worker import Worker
 
 from nova_core.logging import configure_logging
 from nova_core.settings import get_settings
-from nova_core.temporal import ENGINE_QUEUE, client
+from nova_core.telemetry import configure_tracing
+from nova_core.temporal import ENGINE_QUEUE, LogContext, client
 from nova_engine import activities
 from nova_engine.interpreter import NovaWorkflow
 
 
 async def main() -> None:
-    configure_logging(get_settings().log_level)
+    s = get_settings()
+    configure_logging(s.log_level)
+    configure_tracing("nova-engine", s.otel_exporter_otlp_endpoint)
     worker = Worker(
-        await client(), task_queue=ENGINE_QUEUE, workflows=[NovaWorkflow], activities=activities.ALL
+        await client(),
+        task_queue=ENGINE_QUEUE,
+        workflows=[NovaWorkflow],
+        activities=activities.ALL,
+        interceptors=[LogContext()],
     )
     await worker.run()
 
