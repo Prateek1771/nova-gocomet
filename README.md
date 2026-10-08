@@ -2,7 +2,7 @@
 
 GoComet's governed AI platform for enterprise logistics: a prototype. It has a generic YAML workflow engine on Temporal, governed LangGraph agents, micro-apps for human steps, and a tenant-isolated data layer. Design docs are in [`docs/`](docs/README.md). The build plan and the definition of "done" are in [`docs/07-build-plan.md`](docs/07-build-plan.md).
 
-**Status:** M0 (skeleton). You can log in through Keycloak, the Next.js BFF holds the session, FastAPI validates the token, and Postgres has RLS on every tenant table. Workflows arrive in M1.
+**Status:** M0 (skeleton). You can log in through Keycloak, the Next.js BFF holds the session, FastAPI validates the token, and Postgres has RLS on every tenant table. Workflows arrive in M1
 
 ## Quickstart
 
