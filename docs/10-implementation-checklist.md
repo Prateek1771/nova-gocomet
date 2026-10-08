@@ -100,8 +100,9 @@ See [07 §3](07-build-plan.md#3-phase-0--design-baseline). Remaining items:
 - [ ] uv workspace: `packages/nova_core`, `packages/nova_dsl`, `services/{api,engine,agents,ingest}`, `src/` layout.
 - [ ] `nova_core`: `pydantic-settings` config, async SQLAlchemy 2, tenancy context (`SET app.tenant_id`), Alembic.
 - [ ] Module shape: `api.py` · `models.py` · `service.py` · `repo.py` · `errors.py`.
-- [ ] FastAPI: error envelope, request/correlation ID, `/healthz`, `/readyz`, OpenAPI.
-- [ ] Structured JSON logging with `tenant_id`, `run_id`, `trace_id`; redaction filter.
+- [x] FastAPI: error envelope, request/correlation ID, `/healthz`, `/readyz`, OpenAPI.
+- [x] Structured JSON logging with `tenant_id`, `run_id`, `trace_id` (API access log + engine activities, verified 2026-10-08).
+- [ ] Redaction filter (M2).
 
 ### Frontend
 - [ ] pnpm `apps/web`: Next.js App Router, React 19, TS strict, `output: 'standalone'`.

@@ -80,7 +80,7 @@
 ### Tests
 - [x] RLS smoke: a query as tenant A over tenant B rows returns 0 (`tests/integration/test_rls.py`).
 - [x] Token validation: unit (`tests/unit/test_auth.py`) + real Keycloak realm (`tests/integration/test_keycloak.py`).
-- [ ] Health endpoints in CI via compose.
+- [ ] Health endpoints in CI via compose (verified live 2026-10-08; CI job still to add).
 
 ### Exit criteria
 - [x] `make up` → all core containers healthy; web shows login.
@@ -116,6 +116,14 @@
 - [x] Temporal time-skipping tests: branching, SLA escalation, update resume, `continue_as_new`, cancel, parallel all/any, events, subflow, needs-attention (`tests/engine/`).
 - [x] Idempotency: replaying an action activity produces one `action_executions` row (`tests/integration/test_engine_db.py`).
 - [x] Config pinning: editing TenantConfig mid-run doesn't change that run's routing (same file).
+
+### Verification (2026-10-08)
+A deep test of M0 + M1 before starting M2. All automated suites passed, plus 32 live checks in a headed browser: Keycloak login/logout, the BFF proxy, workflow validate/publish/versions, auto and human runs, claim/complete guards, cancel, config pinning, SLA escalation, cross-tenant 404s, CSRF and bad tokens, and a kill-worker resume (one `action_executions` row). It found 3 defects, now fixed with regression tests in `tests/unit/test_hardening.py`:
+- Logs carried no `tenant_id`/`run_id`. Fix: JSON access log with `tenant_id`, and an activity interceptor `nova_core.temporal.LogContext` binding `tenant_id`/`run_id`/`node_id`.
+- Task claim/complete hung with no engine worker. Fix: bounded update (10 s) → `503 unavailable`.
+- 401 bodies leaked PyJWT internals. Fix: a generic `invalid token`, with the reason logged server-side.
+
+OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](06-adrs.md#adr-021-jaeger-as-the-dev-trace-backend-until-the-m4-collector)).
 
 ### Exit criteria
 - [x] A YAML with a human task runs, waits, resumes on signal and escalates on SLA in tests.
