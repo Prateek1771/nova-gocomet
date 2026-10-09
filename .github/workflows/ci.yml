@@ -121,6 +121,7 @@ jobs:
         include:
           - { name: api, dockerfile: services/api/Dockerfile }
           - { name: engine, dockerfile: services/engine/Dockerfile }
+          - { name: agents, dockerfile: services/agents/Dockerfile }
           - { name: web, dockerfile: apps/web/Dockerfile }
     steps:
       - uses: actions/checkout@v4

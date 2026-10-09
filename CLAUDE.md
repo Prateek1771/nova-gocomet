@@ -2,7 +2,7 @@
 
 Nova is GoComet's governed AI platform for enterprise logistics. This repo is a working prototype of it: a generic YAML workflow engine on Temporal, governed LangGraph agents, micro-apps for human steps, and a tenant-isolated data layer. It runs three workflows: W1 BoL intake, W2 invoice ↔ PO match + approval, and W3 shipment exception monitoring. The source brief is `note.md`.
 
-**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS), M1 (DSL, generic Temporal interpreter, workflow/run/task API) and M2 (W1 BoL slice: uploads, governed agents, Jev decide, inbox + bol_review micro-app, evals) are done. Next: M3 (Studio). Tick tasks in 07 as they land.
+**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS), M1 (DSL, generic Temporal interpreter, workflow/run/task API) M2 (W1 BoL slice: uploads, governed agents, Jev decide, inbox + bol_review micro-app, evals) and M3 (Studio: React Flow + Monaco editor over canonical YAML, catalog, publish/versions, live SSE run graph) are done. Next: M4 (Governance). Tick tasks in 07 as they land.
 
 ## Docs (read before changing anything)
 
@@ -40,7 +40,7 @@ Next.js (App Router) + React 19 + React Flow + shadcn/Tailwind v4 · FastAPI · 
 
 ## Cost: keep LLM spend near zero
 
-- `LLM_MODE=local|cheap|demo`. **`cheap` is the dev default**; use `demo` only for recording the demo.
+- `LLM_MODE=local|free|cheap|demo`. **`free` is the dev default** ($0: Groq free tier, OpenRouter `:free` fallback; synthetic docs only, ADR-025). `cheap`/`demo` are the paid OpenRouter paths for later; use `demo` only for recording the demo.
 - Embeddings use Ollama `nomic-embed-text`.
 - Dev machine: 32 GB RAM, 4-core i5, no GPU, so local models are CPU-only and slow. Tests use recorded LLM responses (VCR); don't add live LLM calls to unit tests.
 

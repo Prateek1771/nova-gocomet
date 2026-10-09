@@ -169,7 +169,7 @@ changes (paths-filter)
 - [ ] Caches: uv (`astral-sh/setup-uv` cache), pnpm store, Next.js `.next/cache`, Docker layers (`type=gha`).
 - [ ] Pinned action versions by SHA; Renovate keeps them current.
 - [ ] Least-privilege `permissions:` per workflow (`contents: read` by default).
-- [ ] Secrets: `OPENROUTER_API_KEY` only in `ai-eval.yml`, in a protected `eval` environment; never available to fork PRs.
+- [x] Secrets: `OPENROUTER_API_KEY` only in `ai-eval.yml`, in a protected `eval` environment; never available to fork PRs.
 - [ ] LiteLLM in CI uses a dedicated virtual key with `max_budget: 2` USD/month.
 - [ ] Test reports (JUnit) + coverage uploaded as artifacts; coverage summary in the PR.
 - [ ] Playwright traces/videos uploaded on failure.
@@ -322,43 +322,43 @@ changes (paths-filter)
 
 # Phase 7 — Document intake & storage · *M2*
 
-- [ ] `POST /documents` multipart → MinIO `tenant/{id}/`.
-- [ ] Extension + MIME + magic-byte checks, size and page limits.
-- [ ] sha256 dedupe per tenant → returns the existing run.
-- [ ] Doc-type classification (`gemma3:1b` or rules) → `DocType.default_workflow` trigger.
-- [ ] Page image rendering for the bbox overlay (`/documents/{id}/pages/{n}`).
-- [ ] Access only via API (no public bucket); safe storage keys.
+- [x] `POST /documents` multipart → MinIO `tenant/{id}/`.
+- [x] Extension + MIME + magic-byte checks, size and page limits.
+- [x] sha256 dedupe per tenant → returns the existing run.
+- [ ] Doc-type classification (`gemma3:1b` or rules) → `DocType.default_workflow` trigger. *(stretch: M2 uploads name the doc type; trigger via `DocType.default_workflow` is done)*
+- [x] ~~Page image rendering~~ replaced by client-side pdf.js render of `/documents/{id}/content` + bbox overlay (ADR-022).
+- [x] Access only via API (no public bucket); safe storage keys.
 
 ### Tests
-- [ ] Malformed / oversized / wrong-magic uploads rejected; duplicate upload → same run.
+- [x] Malformed / oversized / wrong-magic uploads rejected; duplicate upload → same run.
 
 ---
 
 # Phase 8 — Agent platform & LLM gateway · *M2 → M6*
 
-- [ ] `governed_agent` template: scope → context → route → execute → deliver.
-- [ ] `run_agent` activity with Langfuse callback; trace id saved on the step.
-- [ ] `Extractor` interface: `LlmTextLayerExtractor` (pdfplumber → text model, bbox recovery); vision only for scans.
-- [ ] Agents: `doc_extractor`, `bol_validator` (M2) · `invoice_matcher` (M5) · `exception_analyst`, `action_recommender` (M6).
-- [ ] `decide` node → `nova-decide` (Jev) → fallback → human task.
-- [ ] LiteLLM configs `local` / `cheap` / `demo`; Redis cache; global `max_budget`; per-tenant keys.
+- [x] `governed_agent` template: scope → context → route → execute → deliver.
+- [ ] `run_agent` activity with Langfuse callback; trace id saved on the step. *(activity + OTel trace done in M2; Langfuse callback with the `ai` profile in M4)*
+- [x] `Extractor` interface: `LlmTextLayerExtractor` (pdfplumber → text model, bbox recovery); vision only for scans.
+- [ ] Agents: `doc_extractor` ✅, `bol_validator` ✅ (M2) · `invoice_matcher` (M5) · `exception_analyst`, `action_recommender` (M6).
+- [x] `decide` node → `nova-decide` (Jev) → fallback → human task.
+- [ ] LiteLLM configs `local` / `cheap` / `demo`; Redis cache; global `max_budget`; per-tenant keys. *(all but per-tenant keys done in M2; those land in M4)*
 - [ ] `nova-embed` via Ollama; `embed_model` stored per Weaviate collection; `make reindex`.
-- [ ] Output schema validation with one repair retry → `needs_attention`.
-- [ ] `make bench-llm`.
+- [x] Output schema validation with one repair retry → `needs_attention`.
+- [x] `make bench-llm`.
 
 ### Tests
-- [ ] VCR-recorded agent tests; bbox matching test set.
-- [ ] Jev eval set (~40 questions); fallback path test.
+- [x] Recorded (fake-model) agent tests; bbox matching test set.
+- [x] Jev eval set (40 questions, `tests/evals/decide_bol.jsonl`); fallback path test.
 
 ---
 
 # Phase 9 — Human tasks & micro-apps · *M2 / M5 / M6*
 
-- [ ] Task create / claim / complete; FGA check → Temporal signal.
+- [ ] Task create / claim / complete; FGA check → Temporal signal. *(create/claim/complete → signal done in M2; FGA `can_complete` in M4)*
 - [ ] SLA due dates, escalation, delegation.
 - [ ] JSON micro-app renderer + component registry: DocumentViewer, FieldForm, ComparisonTable, ExceptionPanel, DecisionBar.
-- [ ] Apps: `bol_review` (M2), `invoice_review` (M5), `exception_panel` (M6).
-- [ ] Mandatory reason for reject/dispute; decision validated against `output_schema`.
+- [ ] Apps: `bol_review` ✅ (M2), `invoice_review` (M5), `exception_panel` (M6).
+- [x] Mandatory reason for reject/dispute; decision validated against `output_schema`.
 
 ### Tests
 - [ ] Completing without the relation → 403; invalid decision payload → 422.
@@ -368,15 +368,15 @@ changes (paths-filter)
 # Phase 10 — Web app (Next.js) · *M2 / M3 / M7*
 
 ### Studio (M3)
-- [ ] React Flow canvas (client island) + elkjs; Monaco + `monaco-yaml`.
-- [ ] Graph edits as `parseDocument()` mutations; `layout:` block.
-- [ ] Palettes from `/catalog`; node side panel; validation badges; publish + version history + YAML diff.
+- [x] React Flow canvas (client island) + elkjs; Monaco + `monaco-yaml`.
+- [x] Graph edits as text splices located with `parseDocument()` (ADR-023/024); `layout:` block.
+- [x] Palettes from `/catalog`; node side panel; validation badges; publish + version history + YAML diff.
 
 ### Runs (M3)
-- [ ] Run list (Server Component) with filters; live run graph via SSE; step inspector with evidence and trace link.
+- [x] Run list (Server Component) with filters; live run graph via SSE; step inspector with output and trace link.
 
 ### Inbox (M2)
-- [ ] My tasks / team tasks; claim; micro-app host; keyboard shortcuts.
+- [x] My tasks / team tasks; claim; micro-app host; keyboard shortcuts.
 
 ### Documents · Exceptions · Admin (M2 / M6 / M4)
 - [ ] Document list + viewer; exceptions dashboard (Recharts); admin: tenants, config versions, budgets, users.
@@ -461,7 +461,7 @@ See the threat model in [08 §4](08-enterprise-execution-plan.md#4-security).
 
 - [ ] Model registry = LiteLLM configs in git, reviewed.
 - [ ] Langfuse datasets from planted errors; per-field F1 and validator recall baselines.
-- [ ] `ai-eval.yml` blocks regressions below baseline.
+- [x] `ai-eval.yml` blocks regressions below baseline (recall 1.0, F1 0.95, decide 0.85).
 - [ ] Every decision-relevant field has evidence, otherwise schema validation fails.
 - [ ] Model card README per agent.
 - [ ] Cost per run in the UI; budget at 80% → alert; 100% → `needs_attention`.

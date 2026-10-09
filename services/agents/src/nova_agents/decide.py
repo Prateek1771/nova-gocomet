@@ -4,6 +4,7 @@
    clean documents touchless for free.
 2. Jev's decisions API (typed `noul` answers: P(yes), ~1-2 s, ~$0.00002), through the gateway's
    /jev/decisions pass-through. yes = P(yes) >= the question's threshold (set in the definition).
+   Paid, so skipped when LLM_MODE is local or free.
 3. Chat fallback: nova-decide → nova-decide-fallback with a strict {"answers","why"} contract.
 4. Nothing valid → a non-retryable failure the engine turns into a human task.
 """
@@ -58,7 +59,7 @@ async def _jev(
     ask: list[dict[str, Any]], calls: list[dict[str, Any]]
 ) -> tuple[dict[str, float], float] | None:
     s = get_settings()
-    if not s.jev_model or s.llm_mode == "local":
+    if not s.jev_model or s.llm_mode in {"local", "free"}:  # Jev is paid
         return None
     body = {
         "model": s.jev_model,

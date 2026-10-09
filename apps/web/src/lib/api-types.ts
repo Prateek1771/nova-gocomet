@@ -21,6 +21,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Actions */
+        get: operations["actions_api_v1_catalog_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agents */
+        get: operations["agents_api_v1_catalog_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Apps */
+        get: operations["apps_api_v1_catalog_apps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents": {
         parameters: {
             query?: never;
@@ -136,6 +187,29 @@ export interface paths {
         put?: never;
         /** Cancel */
         post: operations["cancel_api_v1_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream
+         * @description SSE for the live run view (FR-1.7): a `snapshot` event (the run detail) whenever it changes, until
+         *     the run ends. The event id is a hash of the snapshot, so a reconnect with Last-Event-ID skips a
+         *     snapshot the client already has. ponytail: polls the projection every 0.5 s; Postgres LISTEN/NOTIFY
+         *     on run_steps if many viewers ever make polling cost something.
+         */
+        get: operations["stream_api_v1_runs__run_id__stream_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -303,6 +377,23 @@ export interface paths {
          * @description Validates the posted YAML, or the saved draft when there's no body.
          */
         post: operations["validate_api_v1_workflows__key__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions */
+        get: operations["list_versions_api_v1_workflows__key__versions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -654,6 +745,15 @@ export interface components {
             /** Yaml */
             yaml: string;
         };
+        /** VersionBrief */
+        VersionBrief: {
+            /** Published At */
+            published_at: string | null;
+            /** Published By */
+            published_by: string | null;
+            /** Version */
+            version: number;
+        };
         /** WorkflowSummary */
         WorkflowSummary: {
             /** Has Draft */
@@ -703,6 +803,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    actions_api_v1_catalog_actions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    agents_api_v1_catalog_agents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    apps_api_v1_catalog_apps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };
@@ -972,6 +1138,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_api_v1_runs__run_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "last-event-id"?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -1339,6 +1538,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Validation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_workflows__key__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionBrief"][];
                 };
             };
             /** @description Validation Error */

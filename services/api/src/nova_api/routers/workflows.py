@@ -8,15 +8,18 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from nova_api import definitions
 from nova_api.authz import TenantDep, authorize
 from nova_api.errors import ApiError
 from nova_core import db
 from nova_dsl import Issue, parse_workflow
-from nova_dsl.models import SubflowNode
+from nova_dsl.models import ActionNode, AgentNode, HumanTaskNode, SubflowNode
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 DRAFT = 0
 KEY = r"^[a-z][a-z0-9_]*$"
+# node class, the attribute naming what it references, the catalog section it must be in
+REFS = ((AgentNode, "agent", "agents"), (ActionNode, "action", "actions"), (HumanTaskNode, "app", "apps"))
 
 
 class DraftIn(BaseModel):
@@ -80,7 +83,12 @@ async def _check(c: TenantDep, key: str, yaml: str) -> tuple[Any, list[Issue]]:
                 ).scalars()
             )
         issues += [Issue("unknown_subflow", f"no published workflow {k!r}") for k in sorted(subflows - known)]
-    # ponytail: action/agent names are checked against /catalog in M3; unknown ones fail at run time
+    cat = {k: {e["key"] for e in v} for k, v in definitions.catalog().items()}
+    for n in wf.nodes:
+        for cls, kind, ref in REFS:
+            name = getattr(n, kind, None)
+            if isinstance(n, cls) and name not in cat[ref]:
+                issues.append(Issue(f"unknown_{kind}", f"no {kind} {name!r} in the catalog", n.id))
     return wf, issues
 
 
@@ -194,6 +202,31 @@ async def publish(c: TenantDep, key: str) -> Published:
         except IntegrityError as e:  # two publishes raced for the same version number
             raise HTTPException(409, "another publish just happened; retry") from e
     return Published(key=key, version=version)
+
+
+class VersionBrief(BaseModel):
+    version: int
+    published_by: str | None
+    published_at: str | None
+
+
+@router.get("/{key}/versions")
+async def list_versions(c: TenantDep, key: str) -> list[VersionBrief]:
+    await authorize(c, "can_view", f"workflow:{c.tenant_id}/{key}")
+    async with db.tenant_session(c.tenant_id) as s:
+        rows = await s.execute(
+            text("""select version, published_by, published_at from workflow_definitions
+                    where key = :k and status <> 'draft' order by version desc"""),
+            {"k": key},
+        )
+        return [
+            VersionBrief(
+                version=r.version,
+                published_by=r.published_by,
+                published_at=r.published_at.isoformat() if r.published_at else None,
+            )
+            for r in rows
+        ]
 
 
 @router.get("/{key}/versions/{version}")

@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Badge, Card, cx, duration, money, StatusBadge, timeAgo } from "@/components/ui";
-import { apiGetOrNotFound } from "@/lib/api";
+import { RunGraphIsland } from "@/features/studio/island";
+import { apiGet, apiGetOrNotFound } from "@/lib/api";
 import { env } from "@/lib/env";
 import type { RunDetail, StepOut } from "@/lib/types";
 
@@ -62,14 +63,17 @@ function Summary({ s }: { s: StepOut }) {
 
 export default async function RunPage(props: PageProps<"/runs/[id]">) {
   const { id } = await props.params;
+  const tab = (await props.searchParams).tab === "timeline" ? "timeline" : "graph";
   const run = await apiGetOrNotFound<RunDetail>(`/runs/${id}`);
+  // the graph is drawn from the version this run is pinned to, not the latest
+  const pinned = tab === "graph" ? await apiGet<{ yaml: string }>(`/workflows/${run.workflow_key}/versions/${run.version}`) : null;
   const wf = run.temporal_workflow_id ?? `run-${run.id}`;
   const jaeger = `${env.jaegerUiUrl}/search?service=nova-engine&limit=20&lookback=2d&tags=${encodeURIComponent(JSON.stringify({ temporalWorkflowID: wf }))}`;
   const live = run.status === "running" || run.status === "pending";
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <AutoRefresh active={live} />
+    <div className="mx-auto max-w-6xl">
+      <AutoRefresh active={live && tab === "timeline"} />
       <Link href="/runs" className="mb-3 inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
         <ArrowLeft className="size-3.5" /> Runs
       </Link>
@@ -111,6 +115,27 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
         </Card>
       )}
 
+      <div className="mb-3 flex gap-1 border-b border-line" role="tablist">
+        {(["graph", "timeline"] as const).map((t) => (
+          <Link
+            key={t}
+            href={t === "graph" ? `/runs/${run.id}` : `/runs/${run.id}?tab=timeline`}
+            role="tab"
+            aria-selected={tab === t}
+            className={cx("-mb-px border-b-2 px-3 py-1.5 text-sm font-medium capitalize", tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink")}
+          >
+            {t}
+          </Link>
+        ))}
+      </div>
+
+      {pinned && (
+        <Card className="h-[max(560px,calc(100vh-300px))] overflow-hidden">
+          <RunGraphIsland yaml={pinned.yaml} initial={run} />
+        </Card>
+      )}
+
+      {tab === "timeline" && (
       <Card className="p-4">
         <h2 className="mb-3 text-sm font-semibold">Timeline</h2>
         <ol className="relative ml-3 border-l border-line">
@@ -156,6 +181,7 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
           Started {timeAgo(run.started_at)} · input <code className="font-mono">{JSON.stringify(run.input)}</code>
         </p>
       </Card>
+      )}
     </div>
   );
 }

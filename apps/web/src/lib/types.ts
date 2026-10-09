@@ -34,3 +34,12 @@ export type JsonSchema = {
   items?: JsonSchema;
   required?: string[];
 };
+
+/** Studio (M3): catalog entries from definitions/catalog.yaml, served by /catalog/*. */
+export type CatalogParam = { type: "string" | "expression" | "number"; required?: boolean; hint?: string };
+export type CatalogEntry = { key: string; title: string; description?: string; tier?: string; builtin?: boolean; with?: Record<string, CatalogParam>; outputs?: string[] };
+export type Catalog = { agents: CatalogEntry[]; actions: CatalogEntry[]; apps: CatalogEntry[] };
+export type ValidationIssue = { code: string; message: string; node_id: string | null };
+export type Validation = { valid: boolean; issues: ValidationIssue[] };
+export type VersionBrief = S["VersionBrief"];
+export type WorkflowSummary = S["WorkflowSummary"];

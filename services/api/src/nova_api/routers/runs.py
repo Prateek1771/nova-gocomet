@@ -1,10 +1,15 @@
 """Runs: create the projection row, start NovaWorkflow, read the projection the engine writes."""
 
+import asyncio
+import hashlib
+import time
 import uuid
+from collections.abc import AsyncIterator
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -16,6 +21,8 @@ from nova_core.runs import create_run
 router = APIRouter(prefix="/runs", tags=["runs"])
 log = structlog.get_logger()
 TERMINAL = ("completed", "rejected", "cancelled", "failed")
+POLL_S = 0.5
+HEARTBEAT_S = 15.0
 
 
 class StartIn(BaseModel):
@@ -186,6 +193,42 @@ async def get_run(c: TenantDep, run_id: uuid.UUID) -> RunDetail:
                 for x in tasks
             ],
         )
+
+
+@router.get("/{run_id}/stream")
+async def stream(
+    c: TenantDep, run_id: uuid.UUID, request: Request, last_event_id: str | None = Header(None)
+) -> StreamingResponse:
+    """SSE for the live run view (FR-1.7): a `snapshot` event (the run detail) whenever it changes, until
+    the run ends. The event id is a hash of the snapshot, so a reconnect with Last-Event-ID skips a
+    snapshot the client already has. ponytail: polls the projection every 0.5 s; Postgres LISTEN/NOTIFY
+    on run_steps if many viewers ever make polling cost something."""
+    first = await get_run(c, run_id)  # 404 / authz before the stream opens
+
+    async def events() -> AsyncIterator[str]:
+        sent, beat, detail = last_event_id, time.monotonic(), first
+        while True:
+            body = detail.model_dump_json()
+            eid = hashlib.sha256(body.encode()).hexdigest()[:16]
+            if eid != sent:
+                sent, beat = eid, time.monotonic()
+                yield f"id: {eid}\nevent: snapshot\ndata: {body}\n\n"
+            if detail.status in TERMINAL:
+                yield "event: end\ndata: {}\n\n"
+                return
+            if time.monotonic() - beat > HEARTBEAT_S:
+                beat = time.monotonic()
+                yield ": keep-alive\n\n"
+            await asyncio.sleep(POLL_S)
+            if await request.is_disconnected():
+                return
+            detail = await get_run(c, run_id)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
+    )
 
 
 @router.post("/{run_id}/cancel", status_code=202)

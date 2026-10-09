@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from nova_api import errors
 from nova_api.deps import CallerDep
-from nova_api.routers import apps, config, documents, runs, tasks, workflows
+from nova_api.routers import apps, catalog, config, documents, runs, tasks, workflows
 from nova_core import db
 from nova_core.logging import configure_logging
 from nova_core.settings import get_settings
@@ -85,6 +85,7 @@ async def me(c: CallerDep) -> dict[str, Any]:
     return {"sub": p.sub, "email": p.email, "name": p.name, "tenant": tenant, "roles": sorted(p.roles)}
 
 
-for r in (workflows.router, runs.router, tasks.router, config.router, documents.router, apps.router):
+routers = (workflows, runs, tasks, config, documents, apps, catalog)
+for r in (m.router for m in routers):
     v1.include_router(r)
 app.include_router(v1)

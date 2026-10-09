@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import yaml
 from fastapi import HTTPException
 
 from nova_dsl import DocType, parse_doc_type
@@ -43,3 +44,10 @@ def schema(key: str) -> dict[str, Any]:
     if not path.is_file():
         raise HTTPException(404, f"schema {key!r} not found")
     return dict(json.loads(path.read_text(encoding="utf-8")))
+
+
+@lru_cache
+def catalog() -> dict[str, list[dict[str, Any]]]:
+    """Agents, actions and micro-apps the Studio offers and publish accepts (definitions/catalog.yaml)."""
+    data = yaml.safe_load((ROOT / "catalog.yaml").read_text(encoding="utf-8"))
+    return {k: list(data.get(k) or []) for k in ("agents", "actions", "apps")}

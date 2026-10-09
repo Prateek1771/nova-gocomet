@@ -104,7 +104,7 @@ services:
     image: ghcr.io/berriai/litellm:main-stable
     profiles: [core]
     # ../.env carries the app's DATABASE_URL; LiteLLM gets its own DB (spend, budgets, admin UI)
-    entrypoint: ["sh", "-c", "export DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm; exec litellm --config /configs/config.$${LLM_MODE:-cheap}.yaml --port 4000"]
+    entrypoint: ["sh", "-c", "export DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm; exec litellm --config /configs/config.$${LLM_MODE:-free}.yaml --port 4000"]
     env_file:
       - path: ../.env
         required: false
@@ -156,7 +156,7 @@ services:
     environment:
       <<: *api-env
       LLM_API_KEY: sk-nova-dev
-      LLM_MODE: ${LLM_MODE:-cheap}
+      LLM_MODE: ${LLM_MODE:-free}
       JEV_MODEL: typesafe/jev-1.13  # decisions model behind the gateway's /jev/decisions
     restart: unless-stopped
     depends_on:

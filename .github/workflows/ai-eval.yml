@@ -1,0 +1,43 @@
+# docs/10 Phase 2 · AI regression gate: live W1 eval through the LiteLLM gateway (`cheap`, ~$0.01 a run).
+# Fails when validator recall < 1.0, extraction micro F1 < 0.95 or decide accuracy < 0.85 (scripts/eval_llm.py).
+# Runs on PRs that can change model behaviour, nightly and on demand. The key lives in the protected `eval`
+# environment, so fork PRs (no secrets) skip it and rely on the recorded tests in ci.yml.
+name: ai-eval
+
+on:
+  pull_request:
+    paths: ["services/agents/**", "prompts/**", "infra/litellm/**", "definitions/schemas/**", "scripts/eval_llm.py"]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    if: github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    environment: eval
+    timeout-minutes: 20
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      LLM_MODE: free  # $0 models (ADR-025); set to cheap once paid models are on
+      LLM_BASE_URL: http://localhost:4100
+      LLM_API_KEY: sk-nova-dev
+      JEV_MODEL: typesafe/jev-1.13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { enable-cache: true }
+      - run: uv sync --frozen
+      - name: Start the gateway (postgres + litellm only)
+        run: |
+          printf 'LLM_MODE=%s\nGROQ_API_KEY=%s\nOPENROUTER_API_KEY=%s\n' "$LLM_MODE" "$GROQ_API_KEY" "$OPENROUTER_API_KEY" > .env
+          docker compose -f infra/docker-compose.yml --profile core up -d --wait postgres litellm
+          timeout 180 sh -c 'until curl -sf localhost:4100/health/liveliness; do sleep 3; done'
+      - run: uv run python scripts/eval_llm.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: m2-eval, path: docs/evals/m2-baseline.json }

@@ -6,7 +6,7 @@
 - timings p50/p95 per stage, cache bypassed so they're real
 
 Run: LLM_BASE_URL=http://localhost:4100 JEV_MODEL=typesafe/jev-1.13 uv run python scripts/eval_llm.py
-Writes docs/evals/m2-baseline.json.
+Writes docs/evals/m2-baseline.json (cheap) or docs/evals/<mode>-baseline.json.
 """
 
 import asyncio
@@ -23,6 +23,7 @@ import yaml
 from nova_agents import checks
 from nova_agents.decide import decide
 from nova_agents.extractor import extract
+from nova_agents.llm import LLMError
 from nova_core.settings import get_settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,7 +68,13 @@ async def main() -> None:
             data = gen_bols.scan(data)
         calls: list[Any] = []
         t0 = time.perf_counter()
-        out = await extract(data, "bol_v1", {"eval": "m2"}, calls.append, fresh=True)
+        for attempt in (1, 2, 3):  # like the activity's retry policy: a cut-off answer is retryable
+            try:
+                out = await extract(data, "bol_v1", {"eval": "m2"}, calls.append, fresh=True)
+                break
+            except LLMError:
+                if attempt == 3:
+                    raise
         ext_ms.append((time.perf_counter() - t0) * 1000)
         cost += sum(c.cost_usd for c in calls)
         wrong = []
@@ -164,7 +171,8 @@ async def main() -> None:
             "misses": misses,
         },
     }
-    out_path = ROOT / "docs/evals/m2-baseline.json"
+    name = "m2" if s.llm_mode == "cheap" else s.llm_mode  # one baseline per mode
+    out_path = ROOT / f"docs/evals/{name}-baseline.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=1), encoding="utf-8")
     print(
@@ -179,7 +187,15 @@ async def main() -> None:
         )
     )
     print("field F1:", {k: v for k, v in f1.items() if v < 1.0} or "all 1.0")
-    sys.exit(0 if report["validator"]["recall"] == 1.0 else 1)
+    # regression gate (ai-eval.yml): a planted error must never slip through
+    gates = {
+        "validator recall == 1.0": report["validator"]["recall"] == 1.0,
+        "extraction micro F1 >= 0.95": report["extraction"]["micro_f1"] >= 0.95,
+        "decide accuracy >= 0.85": report["decide"]["accuracy"] >= 0.85,
+    }
+    for name, ok in gates.items():
+        print(f"{'PASS' if ok else 'FAIL'} {name}")
+    sys.exit(0 if all(gates.values()) else 1)
 
 
 if __name__ == "__main__":

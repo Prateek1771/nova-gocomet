@@ -195,3 +195,55 @@ async def test_ten_seed_bols_route_as_specified(w1: dict[str, Any]) -> None:
         and pdf.content.startswith(b"%PDF")
         and re.search("inline", pdf.headers["content-disposition"])
     )
+
+
+async def test_studio_publish_pins_in_flight_runs_and_streams(w1: dict[str, Any]) -> None:
+    """M3 exit criterion at the API: publish v2 while a run waits on v1; it finishes on v1, new runs use v2.
+    Plus catalog-backed validation, the versions list and the SSE stream."""
+    c = w1["c"]
+    assert {a["key"] for a in (await c.get("/catalog/agents")).json()} == {"doc_extractor", "bol_validator"}
+    assert "tms.upsert_shipment" in {a["key"] for a in (await c.get("/catalog/actions")).json()}
+
+    v1 = (await c.get("/workflows/bol_intake/versions")).json()
+    assert [v["version"] for v in v1] == [1]
+    yaml = (await c.get("/workflows/bol_intake/versions/1")).json()["yaml"]
+
+    bad = (
+        await c.post("/workflows/bol_intake/validate", json={"yaml": yaml.replace("bol_validator", "nope")})
+    ).json()
+    assert not bad["valid"] and {(i["code"], i["node_id"]) for i in bad["issues"]} == {
+        ("unknown_agent", "validate")
+    }
+
+    waiting = next(r for r in (await c.get("/runs?status=waiting_human")).json())
+    assert waiting["version"] == 1
+    v2_yaml = yaml.replace("threshold: 0.4", "threshold: 0.45")
+    assert (await c.put("/workflows/bol_intake/draft", json={"yaml": v2_yaml})).json()["valid"]
+    assert (await c.post("/workflows/bol_intake/publish")).json()["version"] == 2
+
+    task = (await c.get(f"/runs/{waiting['id']}")).json()["tasks"][0]
+    await c.post(f"/tasks/{task['id']}/claim")
+    done = await c.post(
+        f"/tasks/{task['id']}/complete", json={"decision": "rejected", "payload": {"reason": "t"}}
+    )
+    assert done.status_code == 200, done.text
+    old = await _settled(c, waiting["id"])
+    assert old["status"] == "rejected" and old["version"] == 1
+
+    case = CASES[0]
+    up = await c.post("/documents", files={"file": ("v2.pdf", _pdf(case), "application/pdf")})
+    new = await _settled(c, up.json()["run_id"])
+    assert new["version"] == 2
+
+    # SSE on a finished run: one snapshot, then `end`; the same Last-Event-ID skips the snapshot
+    r = await c.get(f"/runs/{new['id']}/stream")
+    assert r.headers["content-type"].startswith("text/event-stream")
+    events = [e for e in r.text.split("\n\n") if e]
+    assert (
+        events[0].startswith("id: ")
+        and "event: snapshot" in events[0]
+        and events[-1].startswith("event: end")
+    )
+    eid = events[0].split("\n")[0][4:]
+    again = await c.get(f"/runs/{new['id']}/stream", headers={"last-event-id": eid})
+    assert "event: snapshot" not in again.text and "event: end" in again.text

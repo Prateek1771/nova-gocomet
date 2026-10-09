@@ -980,6 +980,43 @@
         "title": "Version",
         "type": "object"
       },
+      "VersionBrief": {
+        "properties": {
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "published_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published By"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "published_by",
+          "published_at"
+        ],
+        "title": "VersionBrief",
+        "type": "object"
+      },
       "WorkflowSummary": {
         "properties": {
           "has_draft": {
@@ -1082,6 +1119,99 @@
         "summary": "Get App",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/catalog/actions": {
+      "get": {
+        "operationId": "actions_api_v1_catalog_actions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Actions Api V1 Catalog Actions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actions",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/catalog/agents": {
+      "get": {
+        "operationId": "agents_api_v1_catalog_agents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Agents Api V1 Catalog Agents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agents",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/catalog/apps": {
+      "get": {
+        "operationId": "apps_api_v1_catalog_apps_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Apps Api V1 Catalog Apps Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Apps",
+        "tags": [
+          "catalog"
         ]
       }
     },
@@ -1524,6 +1654,69 @@
           }
         ],
         "summary": "Cancel",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/stream": {
+      "get": {
+        "description": "SSE for the live run view (FR-1.7): a `snapshot` event (the run detail) whenever it changes, until\nthe run ends. The event id is a hash of the snapshot, so a reconnect with Last-Event-ID skips a\nsnapshot the client already has. ponytail: polls the projection every 0.5 s; Postgres LISTEN/NOTIFY\non run_steps if many viewers ever make polling cost something.",
+        "operationId": "stream_api_v1_runs__run_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "last-event-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Stream",
         "tags": [
           "runs"
         ]
@@ -2106,6 +2299,57 @@
           }
         ],
         "summary": "Validate",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/v1/workflows/{key}/versions": {
+      "get": {
+        "operationId": "list_versions_api_v1_workflows__key__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VersionBrief"
+                  },
+                  "title": "Response List Versions Api V1 Workflows  Key  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Versions",
         "tags": [
           "workflows"
         ]

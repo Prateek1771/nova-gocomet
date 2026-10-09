@@ -12,7 +12,7 @@ const NAV = [
   { label: "Inbox", href: "/inbox", icon: Inbox, m: null, badge: "tasks" as const },
   { label: "Documents", href: "/documents", icon: FileText, m: null },
   { label: "Runs", href: "/runs", icon: Activity, m: null },
-  { label: "Studio", href: "/studio", icon: Workflow, m: "M3" },
+  { label: "Studio", href: "/studio", icon: Workflow, m: null },
   { label: "Exceptions", href: "/exceptions", icon: ShieldAlert, m: "M6" },
   { label: "Admin", href: "/admin", icon: Settings, m: "M4" },
 ];

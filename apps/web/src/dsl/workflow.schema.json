@@ -1,0 +1,1041 @@
+{
+  "$defs": {
+    "ActionNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "action",
+          "title": "Type",
+          "type": "string"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "title": "With",
+          "type": "object"
+        },
+        "retry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "action"
+      ],
+      "title": "ActionNode",
+      "type": "object"
+    },
+    "AgentNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "agent",
+          "title": "Type",
+          "type": "string"
+        },
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "title": "With",
+          "type": "object"
+        },
+        "retry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "agent"
+      ],
+      "title": "AgentNode",
+      "type": "object"
+    },
+    "Assignee": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        }
+      },
+      "title": "Assignee",
+      "type": "object"
+    },
+    "Case": {
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "title": "When",
+          "type": "string"
+        },
+        "goto": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Goto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "goto"
+      ],
+      "title": "Case",
+      "type": "object"
+    },
+    "Criteria": {
+      "additionalProperties": false,
+      "description": "What a yes and a no mean, in the domain's words (Jev `noul` criteria, LLD \u00a73.4).",
+      "properties": {
+        "true": {
+          "title": "True",
+          "type": "string"
+        },
+        "false": {
+          "title": "False",
+          "type": "string"
+        }
+      },
+      "required": [
+        "true",
+        "false"
+      ],
+      "title": "Criteria",
+      "type": "object"
+    },
+    "DecideNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "decide",
+          "title": "Type",
+          "type": "string"
+        },
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "minItems": 1,
+          "title": "Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "questions"
+      ],
+      "title": "DecideNode",
+      "type": "object"
+    },
+    "Edge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "To",
+          "type": "string"
+        },
+        "on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "title": "Edge",
+      "type": "object"
+    },
+    "EndNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "end",
+          "title": "Type",
+          "type": "string"
+        },
+        "status": {
+          "default": "completed",
+          "enum": [
+            "completed",
+            "rejected",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "EndNode",
+      "type": "object"
+    },
+    "Escalate": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "examples": [
+            "120s",
+            "4h"
+          ],
+          "pattern": "^\\d+(s|m|h|d)$",
+          "title": "After",
+          "type": "string"
+        },
+        "to": {
+          "$ref": "#/$defs/Assignee"
+        }
+      },
+      "required": [
+        "after",
+        "to"
+      ],
+      "title": "Escalate",
+      "type": "object"
+    },
+    "HumanTaskNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "human_task",
+          "title": "Type",
+          "type": "string"
+        },
+        "assignee": {
+          "$ref": "#/$defs/Assignee"
+        },
+        "app": {
+          "title": "App",
+          "type": "string"
+        },
+        "sla": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sla"
+        },
+        "escalate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Escalate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "outputs": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Outputs",
+          "type": "array"
+        },
+        "with": {
+          "additionalProperties": true,
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "assignee",
+        "app"
+      ],
+      "title": "HumanTaskNode",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "tenant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tenant"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "ParallelNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "parallel",
+          "title": "Type",
+          "type": "string"
+        },
+        "branches": {
+          "items": {
+            "items": {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Branches",
+          "type": "array"
+        },
+        "join": {
+          "default": "all",
+          "enum": [
+            "all",
+            "any"
+          ],
+          "title": "Join",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "branches"
+      ],
+      "title": "ParallelNode",
+      "type": "object"
+    },
+    "Question": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "ask": {
+          "title": "Ask",
+          "type": "string"
+        },
+        "context": {
+          "default": null,
+          "title": "Context"
+        },
+        "criteria": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Criteria"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "threshold": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "ask"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "Retry": {
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        }
+      },
+      "title": "Retry",
+      "type": "object"
+    },
+    "RuleNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "rule",
+          "title": "Type",
+          "type": "string"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/Case"
+          },
+          "minItems": 1,
+          "title": "Cases",
+          "type": "array"
+        },
+        "default": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "cases",
+        "default"
+      ],
+      "title": "RuleNode",
+      "type": "object"
+    },
+    "SubflowNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "subflow",
+          "title": "Type",
+          "type": "string"
+        },
+        "workflow": {
+          "pattern": "^[a-z][a-z0-9_]*(@\\d+)?$",
+          "title": "Workflow",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "workflow"
+      ],
+      "title": "SubflowNode",
+      "type": "object"
+    },
+    "Trigger": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "manual",
+          "enum": [
+            "manual",
+            "document_upload",
+            "event",
+            "schedule"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "doc_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Type"
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Event"
+        },
+        "cron": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cron"
+        }
+      },
+      "title": "Trigger",
+      "type": "object"
+    },
+    "WaitNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "const": "wait",
+          "title": "Type",
+          "type": "string"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "examples": [
+                "120s",
+                "4h"
+              ],
+              "pattern": "^\\d+(s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Event"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "WaitNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "nova/v1",
+      "default": "nova/v1",
+      "title": "Apiversion",
+      "type": "string"
+    },
+    "kind": {
+      "const": "Workflow",
+      "default": "Workflow",
+      "title": "Kind",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "trigger": {
+      "$ref": "#/$defs/Trigger"
+    },
+    "inputs": {
+      "additionalProperties": true,
+      "title": "Inputs",
+      "type": "object"
+    },
+    "nodes": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "action": "#/$defs/ActionNode",
+            "agent": "#/$defs/AgentNode",
+            "decide": "#/$defs/DecideNode",
+            "end": "#/$defs/EndNode",
+            "human_task": "#/$defs/HumanTaskNode",
+            "parallel": "#/$defs/ParallelNode",
+            "rule": "#/$defs/RuleNode",
+            "subflow": "#/$defs/SubflowNode",
+            "wait": "#/$defs/WaitNode"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/AgentNode"
+          },
+          {
+            "$ref": "#/$defs/DecideNode"
+          },
+          {
+            "$ref": "#/$defs/RuleNode"
+          },
+          {
+            "$ref": "#/$defs/HumanTaskNode"
+          },
+          {
+            "$ref": "#/$defs/ActionNode"
+          },
+          {
+            "$ref": "#/$defs/ParallelNode"
+          },
+          {
+            "$ref": "#/$defs/WaitNode"
+          },
+          {
+            "$ref": "#/$defs/SubflowNode"
+          },
+          {
+            "$ref": "#/$defs/EndNode"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Nodes",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/Edge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "layout": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Layout"
+    }
+  },
+  "required": [
+    "metadata",
+    "nodes"
+  ],
+  "title": "Workflow",
+  "type": "object"
+}

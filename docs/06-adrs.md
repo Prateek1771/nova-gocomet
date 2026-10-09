@@ -152,3 +152,29 @@ Format: Context → Decision → Alternatives → Consequences. Status for all: 
 **Decision.** The AST only *locates* things. Each graph edit (set field, move, add node/edge, remove node) is a text splice at the target node's source range; new content is generated with `yaml` and inserted with the collection's indent. Functions are text → text, keep CRLF/LF, and refuse invalid YAML.
 **Alternatives.** CST-level editing (`yaml`'s `CST` API): exact, but much more code for the same result. Re-serialising with tuned options: fixes padding, not folding, and breaks again on the next style difference.
 **Consequences.** Untouched bytes are identical by construction (vitest: no-op, one-line edit, append, remove, CRLF). M3's React Flow canvas calls these functions and re-renders from `toGraph(text)`.
+
+## ADR-024: Studio build decisions (catalog contract, SSE by polling, Monaco pin)
+
+**Context.** M3 needs palettes and reference checks for agents/actions/apps, a live run view, and a schema-aware YAML editor, without breaking rule 9 (services never import each other) or rule 7 (YAML canonical).
+**Decision.**
+- **Catalog as a checked-in contract.** `definitions/catalog.yaml` lists agents, actions and micro-apps with their `with` params. The API serves it (`/catalog/*`) and `_check` reports `unknown_agent|action|app` with the node id. `tests/unit/test_catalog.py` fails if it drifts from the engine's `ACTIONS` registry or the agents' `AGENTS` dict, so the API never imports either service.
+- **SSE by polling the projection.** `GET /runs/{id}/stream` re-reads the run detail every 0.5 s and emits a `snapshot` only when it changes (event id = hash, so `Last-Event-ID` skips a duplicate), plus `end` on a terminal status. Measured step-to-browser latency through the Next.js proxy: max 0.6 s.
+- **Studio edits stay text splices** (ADR-023), extended with `setPath` (nested values; flow collections are re-inlined as one line), `appendItem` / `removeItem` (rule cases), `removeEdge`, `moveNodes`. A seeded property test (250 random op sequences, LF + CRLF) checks comments and unrelated lines survive.
+- **Monaco self-hosted, pinned to 0.54.** 0.55+ ships an `exports` map that breaks `monaco-yaml`'s worker import (`monaco-worker-manager` imports `monaco-editor/esm/vs/editor/editor.worker.js`). The DSL JSON Schema is copied into `apps/web/src/dsl/` by `pnpm gen:dsl` (the web image only sees `apps/web`).
+**Alternatives.** Catalog via a `/catalog` call to the engine/agents (a runtime coupling for static data). Postgres `LISTEN/NOTIFY` for SSE (better at many viewers; polling is one indexed read per viewer per 0.5 s, fine for the prototype). Monaco from the CDN (no CSP-friendly self-hosting, and still needs the worker fix).
+**Consequences.** Adding an action or agent = register it + add a catalog entry (the unit test reminds you). Upgrade path: swap the SSE loop's poll for `LISTEN run_steps_changed` without changing the event format; unpin Monaco when `monaco-yaml` supports the exports map.
+
+## ADR-025: Free-tier LLM routing (Groq + OpenRouter `:free`) as the dev default
+
+**Context.** Until paid models are approved, LLM spend must be $0. ADR-022 made `cheap` (paid OpenRouter models + Jev) the dev default.
+**Decision.** Supersedes ADR-022's default mode only.
+- New `LLM_MODE=free` (`infra/litellm/config.free.yaml`), now the default in settings, compose and `.env.example`. Text, reason and decide aliases go to Groq's free tier (`gpt-oss-120b` / `gpt-oss-20b` / `qwen3.8-27b`, `rpm: 30`). On a 429 or an error, LiteLLM `fallbacks` move to OpenRouter `:free` models (`nemotron-3-super-120b-a12b:free`, then `openrouter/free`). No free Groq model takes images, so `nova-extract-vision` goes straight to `gemma-4-31b-it:free` → `gemma-4-26b-a4b-it:free` → `openrouter/free`. Embeddings stay on Ollama.
+- Jev's decisions API is paid, so `decide` skips it when the mode is `free` (as for `local`) and uses the chat aliases.
+- `max_budget: 1` USD as a tripwire: free models report $0, so spend only appears if a paid model slips into the config.
+- `cheap` and `demo` stay unchanged as the paid OpenRouter paths. Switching back is one `.env` line.
+**Consequences.**
+- Free tiers are rate-limited: Groq allows 30 RPM / 1K RPD per model, and OpenRouter free pools hit 429s upstream. The 7-day Redis cache and the fallback chain absorb most of this. A burst of uploads can still slow down or fail to a human task.
+- Free OpenRouter providers may log prompts, so free mode is for synthetic demo documents only.
+- `:free` ids churn. Re-list them with `curl https://openrouter.ai/api/v1/models` (keep `pricing.prompt == "0"`) and with Groq's `/openai/v1/models`, then re-pin.
+- The ai-eval gates are unchanged. A free model that misses a gate is a finding, not a reason to loosen the gate.
+**Measured (2026-10-09, `docs/evals/free-baseline.json`).** All gates pass: extraction micro-F1 0.986, validator recall 1.0 (5/5), decide accuracy 0.975 (40 cases). Text extraction takes about 2–10 s per BoL on Groq. The one scanned BoL took about 9 min, because both free Gemma vision models were rate-limited upstream and `openrouter/free` sometimes cut off its answer. Free vision is the weak spot; pay for vision first when budget appears. The cost figures in that report are LiteLLM pricing Groq at its paid list price. They predate zeroing Groq's price in the config, and the free plan doesn't bill.

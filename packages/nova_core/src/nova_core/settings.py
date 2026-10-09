@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # LiteLLM proxy (OpenAI-compatible); code only names aliases (CLAUDE.md rule 6)
     llm_base_url: str = "http://localhost:4100"
     llm_api_key: str = "sk-nova-dev"
-    llm_mode: str = "cheap"  # local | cheap | demo (picks the LiteLLM config; local = no cloud calls)
+    llm_mode: str = "free"  # local | free | cheap | demo (picks the LiteLLM config; free = $0 models)
     # decisions-model id for the gateway's /jev/decisions pass-through; config, not code (rule 6)
     jev_model: str = ""
     max_upload_mb: int = 20

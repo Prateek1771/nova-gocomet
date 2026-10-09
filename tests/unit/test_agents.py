@@ -226,6 +226,7 @@ async def test_jev_probability_against_the_definitions_threshold(monkeypatch: py
     from nova_core.settings import get_settings
 
     monkeypatch.setattr(get_settings(), "jev_model", "decisions-model")
+    monkeypatch.setattr(get_settings(), "llm_mode", "cheap")  # Jev is a paid path
     sent: list[dict[str, Any]] = []
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -253,6 +254,7 @@ async def test_jev_down_falls_back_to_chat(monkeypatch: pytest.MonkeyPatch) -> N
     from nova_core.settings import get_settings
 
     monkeypatch.setattr(get_settings(), "jev_model", "decisions-model")
+    monkeypatch.setattr(get_settings(), "llm_mode", "cheap")  # Jev is a paid path
 
     def handler(req: httpx.Request) -> httpx.Response:
         if req.url.path == "/jev/decisions":
@@ -278,3 +280,13 @@ def test_document_cannot_close_its_own_delimiter() -> None:
     assert len(tag) == 16 and user.endswith(f"</doc-{tag}>") and f"<doc-{tag}>" in msgs[0]["content"]
     assert "</document>" not in user and "<system>" not in user and "</doc-abc>" not in user
     assert user.count(f"</doc-{tag}>") == 1
+
+
+async def test_free_mode_never_calls_jev(monkeypatch: pytest.MonkeyPatch) -> None:
+    from nova_core.settings import get_settings
+
+    monkeypatch.setattr(get_settings(), "jev_model", "decisions-model")
+    monkeypatch.setattr(get_settings(), "llm_mode", "free")
+    seen = _fake('{"answers": {"material_issue": true}, "why": {"material_issue": "weight"}}')
+    out = await decide(Q, {})
+    assert out["material_issue"] is True and seen == ["nova-decide"]

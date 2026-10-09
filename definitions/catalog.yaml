@@ -1,0 +1,47 @@
+# What the Studio palette offers and what publish accepts (FR-1.6 "referenced agents/apps exist").
+# The API can't import the engine or agents (CLAUDE.md rule 9), so this is the contract between them:
+# tests/unit/test_catalog.py fails when it drifts from the ACTIONS registry or the AGENTS dict.
+# `with` lists the params a node passes; `type` is a hint for the inspector form.
+agents:
+  - key: doc_extractor
+    title: Document extractor
+    tier: extract
+    description: Reads a PDF (text layer first, vision only for scans) into schema fields with per-field confidence and evidence boxes.
+    with:
+      document_id: {type: string, required: true}
+      schema: {type: string, required: true, hint: "schema key, e.g. bol_v1"}
+    outputs: [fields, confidence, evidence, min_confidence, mode]
+  - key: bol_validator
+    title: BoL validator
+    tier: reason
+    description: Deterministic checks (ISO 6346, UN/LOCODE, booking, weights, dates, HS) first, then the model on the residue.
+    with:
+      document_id: {type: string, required: true}
+      extraction: {type: expression, required: true}
+      severity: {type: expression}
+    outputs: [issues, max_severity]
+
+actions:
+  - key: noop
+    title: No-op
+    description: Does nothing. Handy as a placeholder while modelling.
+    with: {}
+  - key: notify.log
+    title: Notify (log)
+    description: Writes a structured notification to the log. Real channels register as notify.email, notify.slack.
+    with:
+      message: {type: string, required: true}
+  - key: tms.upsert_shipment
+    title: TMS · upsert shipment
+    description: Creates or updates the shipment for a BoL in the TMS (idempotent per run step).
+    with:
+      fields: {type: expression, required: true}
+
+apps:
+  - key: bol_review
+    title: Bill of Lading review
+    description: PDF with evidence boxes, issues, editable fields, approve/reject.
+  - key: generic_review
+    title: Generic approval
+    builtin: true
+    description: Shows the task payload with approve/reject. No definition file needed.

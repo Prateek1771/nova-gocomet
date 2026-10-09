@@ -168,20 +168,20 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
 **Goal:** model a process visually, publish it, watch it run.
 
 ### Tasks
-- [ ] React Flow canvas + elkjs layout as a `next/dynamic` client island; Monaco + `monaco-yaml` with the DSL schema.
-- [ ] Graph edits = targeted `yaml` Document mutations keyed by node id; `layout:` block for positions.
-- [ ] Node palettes from `/catalog/agents`, `/catalog/actions`; side-panel node config.
-- [ ] Validation badges from `/workflows/{key}/validate`; publish → new version (FR-1.3).
-- [ ] Live run view: same graph, per-node status via SSE, step inspector, Langfuse trace links (FR-1.7).
+- [x] React Flow canvas + elkjs layout as a `next/dynamic` client island; Monaco + `monaco-yaml` with the DSL schema (self-hosted, ADR-024).
+- [x] Graph edits = targeted text splices located via the `yaml` AST, keyed by node id (ADR-023/024); `layout:` block for positions.
+- [x] Node palettes from `/catalog/agents`, `/catalog/actions`, `/catalog/apps` (`definitions/catalog.yaml`); side-panel node config per type.
+- [x] Validation badges (autosave returns validation; unknown agent/action/app tagged by node); publish → new version with confirm, version history, read-only old versions, YAML diff vs live (FR-1.3).
+- [x] Live run view: same graph (the run's pinned version), per-node status via SSE, step inspector with output/model calls/cost, Temporal + Jaeger links (FR-1.7; Langfuse links arrive with the `ai` profile in M4).
 
 ### Tests
-- [ ] SSE through the Next.js `/api/v1` proxy delivers events < 1 s.
-- [ ] YAML round-trip property test: random graph ops keep comments and leave unrelated lines byte-identical.
-- [ ] Invalid YAML keeps the last valid graph and shows markers.
-- [ ] axe a11y check on studio and inbox.
+- [x] SSE through the Next.js `/api/v1` proxy delivers events < 1 s (headed Chrome: 7 step events, max 0.6 s after `ended_at`).
+- [x] YAML round-trip property test: 250 seeded random op sequences (LF + CRLF) keep comments and leave unrelated lines byte-identical.
+- [x] Invalid YAML keeps the last valid graph, shows a banner + Monaco markers, and disables publish.
+- [x] axe a11y check on studio, run graph and inbox, light + dark: 0 serious/critical.
 
 ### Exit criteria
-- [ ] Edit W1 visually, publish v2; an in-flight run stays on v1.
+- [x] Edit W1 visually, publish v2; an in-flight run stays on v1 (integration test + headed Chrome, 2026-10-09: run waiting on v6 finished on v6 after v7 was published; the next upload ran v7 through the newly added node).
 
 ---
 

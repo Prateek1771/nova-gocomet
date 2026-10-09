@@ -257,7 +257,7 @@ general_settings:
   database_url: os.environ/LITELLM_DB_URL      # virtual keys + budgets per tenant
 ```
 
-This is the `demo` config. `infra/litellm/config.{local,cheap,demo}.yaml` define the same aliases with different models, and `LLM_MODE` picks one ([brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)). Model IDs are placeholders: pin them at build time to whatever OpenRouter lists, and the code only ever names the aliases.
+This is the `demo` config. `infra/litellm/config.{local,free,cheap,demo}.yaml` define the same aliases with different models, and `LLM_MODE` picks one (`free`, the current dev default, routes Groq free tier → OpenRouter `:free`; ADR-025) ([brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)). Model IDs are placeholders: pin them at build time to whatever OpenRouter lists, and the code only ever names the aliases.
 
 ### 3.4 `decide` node contract (Jev)
 
