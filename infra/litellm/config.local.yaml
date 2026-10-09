@@ -1,0 +1,29 @@
+# LLM_MODE=local: $0 and offline, host Ollama only (CPU: ~1-2 min per BoL, see brainstorm §6.3).
+model_list:
+  - model_name: nova-extract-text
+    litellm_params: {model: ollama_chat/qwen2.5:7b, api_base: http://host.docker.internal:11434, timeout: 600}
+  - model_name: nova-extract-vision
+    litellm_params: {model: ollama_chat/gemma3:4b, api_base: http://host.docker.internal:11434, timeout: 600}
+  - model_name: nova-reason
+    litellm_params: {model: ollama_chat/qwen2.5:7b, api_base: http://host.docker.internal:11434, timeout: 600}
+  - model_name: nova-decide
+    litellm_params: {model: ollama_chat/gemma3:4b, api_base: http://host.docker.internal:11434, timeout: 300}
+  - model_name: nova-decide-fallback
+    litellm_params: {model: ollama_chat/gemma3:1b, api_base: http://host.docker.internal:11434, timeout: 300}
+  - model_name: nova-embed
+    litellm_params: {model: ollama/nomic-embed-text, api_base: http://host.docker.internal:11434}
+litellm_settings:
+  drop_params: true             # providers ignore params they lack (e.g. response_format on ollama)
+  cache: true
+  cache_params: {type: redis, host: redis, port: 6379, ttl: 604800}   # 7 days: rehearsals are free
+  max_budget: 10                # USD, global hard cap for dev (per-tenant virtual keys arrive in M4)
+  budget_duration: 30d
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # Jev's decisions API isn't chat/completions; the gateway forwards it so the key and egress stay here
+  pass_through_endpoints:
+    - path: /jev/decisions
+      target: https://openrouter.ai/api/alpha/decisions
+      headers:
+        Authorization: bearer os.environ/OPENROUTER_API_KEY
+        content-type: application/json

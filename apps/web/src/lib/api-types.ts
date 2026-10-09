@@ -4,6 +4,75 @@
  */
 
 export interface paths {
+    "/api/v1/apps/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get App */
+        get: operations["get_app_api_v1_apps__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents */
+        get: operations["list_documents_api_v1_documents_get"];
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_v1_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: operations["get_document_api_v1_documents__doc_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{doc_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get File */
+        get: operations["get_file_api_v1_documents__doc_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -87,6 +156,23 @@ export interface paths {
          *     in the tenant is listed.
          */
         get: operations["inbox_api_v1_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task */
+        get: operations["get_task_api_v1_tasks__task_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -244,6 +330,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_upload_api_v1_documents_post */
+        Body_upload_api_v1_documents_post: {
+            /**
+             * Doc Type
+             * @default bill_of_lading
+             */
+            doc_type: string;
+            /** File */
+            file: string;
+        };
         /** CompleteIn */
         CompleteIn: {
             /** Decision */
@@ -272,6 +368,48 @@ export interface components {
             key: string;
             /** Yaml */
             yaml: string;
+        };
+        /** DocumentDetail */
+        DocumentDetail: {
+            /** Doc Type */
+            doc_type: string;
+            /** Extraction */
+            extraction: {
+                [key: string]: unknown;
+            } | null;
+            /** Filename */
+            filename: string | null;
+            /** Id */
+            id: string;
+            /** Pages */
+            pages: number | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Run Status */
+            run_status?: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Uploaded At */
+            uploaded_at: string;
+        };
+        /** DocumentOut */
+        DocumentOut: {
+            /** Doc Type */
+            doc_type: string;
+            /** Filename */
+            filename: string | null;
+            /** Id */
+            id: string;
+            /** Pages */
+            pages: number | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Run Status */
+            run_status?: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Uploaded At */
+            uploaded_at: string;
         };
         /** DraftIn */
         DraftIn: {
@@ -307,6 +445,11 @@ export interface components {
         RunDetail: {
             /** Config Version */
             config_version: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
             /** Ended At */
             ended_at: string | null;
             /** Id */
@@ -321,8 +464,14 @@ export interface components {
             status: string;
             /** Steps */
             steps: components["schemas"]["StepOut"][];
+            /** Subject Id */
+            subject_id?: string | null;
+            /** Subject Type */
+            subject_type?: string | null;
             /** Tasks */
             tasks: components["schemas"]["TaskBrief"][];
+            /** Temporal Workflow Id */
+            temporal_workflow_id?: string | null;
             /** Version */
             version: number;
             /** Workflow Key */
@@ -332,6 +481,11 @@ export interface components {
         RunOut: {
             /** Config Version */
             config_version: number;
+            /**
+             * Cost Usd
+             * @default 0
+             */
+            cost_usd: number;
             /** Ended At */
             ended_at: string | null;
             /** Id */
@@ -344,6 +498,12 @@ export interface components {
             started_at: string;
             /** Status */
             status: string;
+            /** Subject Id */
+            subject_id?: string | null;
+            /** Subject Type */
+            subject_type?: string | null;
+            /** Temporal Workflow Id */
+            temporal_workflow_id?: string | null;
             /** Version */
             version: number;
             /** Workflow Key */
@@ -436,6 +596,27 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** UploadOut */
+        UploadOut: {
+            /** Doc Type */
+            doc_type: string;
+            /** Duplicate */
+            duplicate: boolean;
+            /** Filename */
+            filename: string | null;
+            /** Id */
+            id: string;
+            /** Pages */
+            pages: number | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Run Status */
+            run_status?: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Uploaded At */
+            uploaded_at: string;
+        };
         /** Validation */
         Validation: {
             /** Issues */
@@ -493,6 +674,165 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_app_api_v1_apps__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_api_v1_documents_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_v1_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_api_v1_documents__doc_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_api_v1_documents__doc_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -664,6 +1004,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
                 };
             };
             /** @description Validation Error */

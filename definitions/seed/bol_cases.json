@@ -1,0 +1,575 @@
+{
+ "_doc": "W1 seed (docs/04): 4 clean + 6 planted. Source for scripts/gen_bols.py, the bookings seed and eval labels.",
+ "cases": [
+  {
+   "file": "bol_01.pdf",
+   "scan": false,
+   "planted": null,
+   "expected_issues": [],
+   "expect_review": false,
+   "fields": {
+    "bol_number": "MSCU2609017",
+    "carrier_scac": "MSCU",
+    "shipper": "Nhava Seafoods Exports Pvt. Ltd., Plot 14, JNPT SEZ, Navi Mumbai 400707, India",
+    "consignee": "Rotterdam Fresh Foods B.V., Waalhaven O.z. 77, 3087 BM Rotterdam, Netherlands",
+    "notify_party": "Rotterdam Fresh Foods B.V., Waalhaven O.z. 77, 3087 BM Rotterdam, Netherlands",
+    "vessel": "MSC GULSUN",
+    "voyage": "FE238",
+    "pol": "INNSA",
+    "pod": "NLRTM",
+    "container_numbers": [
+     "MSCU1721374",
+     "MSCU1730484"
+    ],
+    "seal_numbers": [
+     "SL870053",
+     "SL870060"
+    ],
+    "package_count": 1200,
+    "gross_weight_kg": 8400.0,
+    "description_of_goods": "Cotton knitted T-shirts, men's",
+    "hs_codes": [
+     "610910"
+    ],
+    "freight_terms": "prepaid",
+    "issue_date": "2026-09-11",
+    "booking_ref": "BKG770101",
+    "cargo_lines": [
+     {
+      "description": "Cotton knitted T-shirts, men's",
+      "hs_code": "610910",
+      "packages": 600,
+      "weight_kg": 4200.0
+     },
+     {
+      "description": "Cotton knitted T-shirts, men's",
+      "hs_code": "610910",
+      "packages": 600,
+      "weight_kg": 4200.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770101",
+    "container_count": 2,
+    "pod": "NLRTM",
+    "consignee": "Rotterdam Fresh Foods B.V.",
+    "booking_date": "2026-09-02"
+   }
+  },
+  {
+   "file": "bol_02.pdf",
+   "scan": false,
+   "planted": null,
+   "expected_issues": [],
+   "expect_review": false,
+   "fields": {
+    "bol_number": "CMDU2609034",
+    "carrier_scac": "CMDU",
+    "shipper": "Pusan Precision Electronics Co., 221 Jungang-daero, Busan 48939, Korea",
+    "consignee": "Hamburg Tech Import GmbH, Am Sandtorkai 5, 20457 Hamburg, Germany",
+    "notify_party": "Hamburg Tech Import GmbH, Am Sandtorkai 5, 20457 Hamburg, Germany",
+    "vessel": "CMA CGM JACQUES SAADE",
+    "voyage": "0MX4LW1MA",
+    "pol": "KRPUS",
+    "pod": "DEHAM",
+    "container_numbers": [
+     "CMAU1722743",
+     "CMAU1731853",
+     "CMAU1740963"
+    ],
+    "seal_numbers": [
+     "SL870106",
+     "SL870113",
+     "SL870120"
+    ],
+    "package_count": 900,
+    "gross_weight_kg": 18000.0,
+    "description_of_goods": "Frozen peeled shrimp, IQF",
+    "hs_codes": [
+     "030617"
+    ],
+    "freight_terms": "collect",
+    "issue_date": "2026-09-12",
+    "booking_ref": "BKG770102",
+    "cargo_lines": [
+     {
+      "description": "Frozen peeled shrimp, IQF",
+      "hs_code": "030617",
+      "packages": 300,
+      "weight_kg": 6000.0
+     },
+     {
+      "description": "Frozen peeled shrimp, IQF",
+      "hs_code": "030617",
+      "packages": 300,
+      "weight_kg": 6000.0
+     },
+     {
+      "description": "Frozen peeled shrimp, IQF",
+      "hs_code": "030617",
+      "packages": 300,
+      "weight_kg": 6000.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770102",
+    "container_count": 3,
+    "pod": "DEHAM",
+    "consignee": "Hamburg Tech Import GmbH",
+    "booking_date": "2026-09-03"
+   }
+  },
+  {
+   "file": "bol_03.pdf",
+   "scan": false,
+   "planted": null,
+   "expected_issues": [],
+   "expect_review": false,
+   "fields": {
+    "bol_number": "HLCU2609051",
+    "carrier_scac": "HLCU",
+    "shipper": "Valencia Ceramica S.L., Calle del Puerto 12, 46024 Valencia, Spain",
+    "consignee": "Gulf Building Supplies LLC, Jebel Ali Free Zone, Dubai, UAE",
+    "notify_party": "Gulf Building Supplies LLC, Jebel Ali Free Zone, Dubai, UAE",
+    "vessel": "BERLIN EXPRESS",
+    "voyage": "2541E",
+    "pol": "ESVLC",
+    "pod": "AEJEA",
+    "container_numbers": [
+     "HLXU1724110"
+    ],
+    "seal_numbers": [
+     "SL870159"
+    ],
+    "package_count": 400,
+    "gross_weight_kg": 5200.0,
+    "description_of_goods": "Laptop computers, 14 inch",
+    "hs_codes": [
+     "847130"
+    ],
+    "freight_terms": "prepaid",
+    "issue_date": "2026-09-13",
+    "booking_ref": "BKG770103",
+    "cargo_lines": [
+     {
+      "description": "Laptop computers, 14 inch",
+      "hs_code": "847130",
+      "packages": 400,
+      "weight_kg": 5200.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770103",
+    "container_count": 1,
+    "pod": "AEJEA",
+    "consignee": "Gulf Building Supplies LLC",
+    "booking_date": "2026-09-04"
+   }
+  },
+  {
+   "file": "bol_04.pdf",
+   "scan": false,
+   "planted": null,
+   "expected_issues": [],
+   "expect_review": false,
+   "fields": {
+    "bol_number": "MAEU2609068",
+    "carrier_scac": "MAEU",
+    "shipper": "Ningbo Autoparts Manufacturing Ltd., 66 Beilun Road, Ningbo 315800, China",
+    "consignee": "Felixstowe Motor Spares Ltd., Dock Road, Felixstowe IP11 3QW, United Kingdom",
+    "notify_party": "Felixstowe Motor Spares Ltd., Dock Road, Felixstowe IP11 3QW, United Kingdom",
+    "vessel": "MAERSK KENSINGTON",
+    "voyage": "432W",
+    "pol": "CNNGB",
+    "pod": "GBFXT",
+    "container_numbers": [
+     "MSKU1725487",
+     "MSKU1734597"
+    ],
+    "seal_numbers": [
+     "SL870212",
+     "SL870219"
+    ],
+    "package_count": 1500,
+    "gross_weight_kg": 21000.0,
+    "description_of_goods": "Glazed ceramic floor tiles",
+    "hs_codes": [
+     "690721"
+    ],
+    "freight_terms": "collect",
+    "issue_date": "2026-09-14",
+    "booking_ref": "BKG770104",
+    "cargo_lines": [
+     {
+      "description": "Glazed ceramic floor tiles",
+      "hs_code": "690721",
+      "packages": 750,
+      "weight_kg": 10500.0
+     },
+     {
+      "description": "Glazed ceramic floor tiles",
+      "hs_code": "690721",
+      "packages": 750,
+      "weight_kg": 10500.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770104",
+    "container_count": 2,
+    "pod": "GBFXT",
+    "consignee": "Felixstowe Motor Spares Ltd.",
+    "booking_date": "2026-09-05"
+   }
+  },
+  {
+   "file": "bol_05.pdf",
+   "scan": false,
+   "planted": "CNTR_CHECK_DIGIT",
+   "expected_issues": [
+    "CNTR_CHECK_DIGIT"
+   ],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "MSCU2609085",
+    "carrier_scac": "MSCU",
+    "shipper": "Saigon Coffee Trading JSC, 19 Ton Duc Thang, District 1, Ho Chi Minh City, Vietnam",
+    "consignee": "New York Gourmet Imports Corp., 45 Water Street, New York, NY 10004, USA",
+    "notify_party": "New York Gourmet Imports Corp., 45 Water Street, New York, NY 10004, USA",
+    "vessel": "MSC GULSUN",
+    "voyage": "FE238",
+    "pol": "VNSGN",
+    "pod": "USNYC",
+    "container_numbers": [
+     "MSCU1726852",
+     "MSCU1735969",
+     "MSCU1745078"
+    ],
+    "seal_numbers": [
+     "SL870265",
+     "SL870272",
+     "SL870279"
+    ],
+    "package_count": 798,
+    "gross_weight_kg": 9600.0,
+    "description_of_goods": "Brake pads for passenger cars",
+    "hs_codes": [
+     "870830"
+    ],
+    "freight_terms": "prepaid",
+    "issue_date": "2026-09-15",
+    "booking_ref": "BKG770105",
+    "cargo_lines": [
+     {
+      "description": "Brake pads for passenger cars",
+      "hs_code": "870830",
+      "packages": 266,
+      "weight_kg": 3200.0
+     },
+     {
+      "description": "Brake pads for passenger cars",
+      "hs_code": "870830",
+      "packages": 266,
+      "weight_kg": 3200.0
+     },
+     {
+      "description": "Brake pads for passenger cars",
+      "hs_code": "870830",
+      "packages": 266,
+      "weight_kg": 3200.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770105",
+    "container_count": 3,
+    "pod": "USNYC",
+    "consignee": "New York Gourmet Imports Corp.",
+    "booking_date": "2026-09-06"
+   }
+  },
+  {
+   "file": "bol_06.pdf",
+   "scan": false,
+   "planted": "CNTR_CHECK_DIGIT",
+   "expected_issues": [
+    "CNTR_CHECK_DIGIT"
+   ],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "CMDU2609102",
+    "carrier_scac": "CMDU",
+    "shipper": "Shanghai Everbright Textiles Co., Ltd., 88 Pudong Avenue, Shanghai 200120, China",
+    "consignee": "Acme Retail Distribution Inc., 1200 Harbor Blvd, Long Beach, CA 90802, USA",
+    "notify_party": "Acme Retail Distribution Inc., 1200 Harbor Blvd, Long Beach, CA 90802, USA",
+    "vessel": "CMA CGM JACQUES SAADE",
+    "voyage": "0MX4LW1MA",
+    "pol": "CNSHA",
+    "pod": "USLGB",
+    "container_numbers": [
+     "CMAU1728222"
+    ],
+    "seal_numbers": [
+     "SL870318"
+    ],
+    "package_count": 320,
+    "gross_weight_kg": 19200.0,
+    "description_of_goods": "Green coffee beans, arabica, not roasted",
+    "hs_codes": [
+     "090111"
+    ],
+    "freight_terms": "collect",
+    "issue_date": "2026-09-16",
+    "booking_ref": "BKG770106",
+    "cargo_lines": [
+     {
+      "description": "Green coffee beans, arabica, not roasted",
+      "hs_code": "090111",
+      "packages": 320,
+      "weight_kg": 19200.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770106",
+    "container_count": 1,
+    "pod": "USLGB",
+    "consignee": "Acme Retail Distribution Inc.",
+    "booking_date": "2026-09-07"
+   }
+  },
+  {
+   "file": "bol_07.pdf",
+   "scan": false,
+   "planted": "LOCODE_UNKNOWN",
+   "expected_issues": [
+    "LOCODE_UNKNOWN"
+   ],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "HLCU2609119",
+    "carrier_scac": "HLCU",
+    "shipper": "Nhava Seafoods Exports Pvt. Ltd., Plot 14, JNPT SEZ, Navi Mumbai 400707, India",
+    "consignee": "Rotterdam Fresh Foods B.V., Waalhaven O.z. 77, 3087 BM Rotterdam, Netherlands",
+    "notify_party": "Rotterdam Fresh Foods B.V., Waalhaven O.z. 77, 3087 BM Rotterdam, Netherlands",
+    "vessel": "BERLIN EXPRESS",
+    "voyage": "2541E",
+    "pol": "INNSA",
+    "pod": "INXNP",
+    "container_numbers": [
+     "HLXU1729597",
+     "HLXU1738705"
+    ],
+    "seal_numbers": [
+     "SL870371",
+     "SL870378"
+    ],
+    "package_count": 600,
+    "gross_weight_kg": 7200.0,
+    "description_of_goods": "Wooden dining chairs",
+    "hs_codes": [
+     "940169"
+    ],
+    "freight_terms": "prepaid",
+    "issue_date": "2026-09-17",
+    "booking_ref": "BKG770107",
+    "cargo_lines": [
+     {
+      "description": "Wooden dining chairs",
+      "hs_code": "940169",
+      "packages": 300,
+      "weight_kg": 3600.0
+     },
+     {
+      "description": "Wooden dining chairs",
+      "hs_code": "940169",
+      "packages": 300,
+      "weight_kg": 3600.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770107",
+    "container_count": 2,
+    "pod": "INXNP",
+    "consignee": "Rotterdam Fresh Foods B.V.",
+    "booking_date": "2026-09-08"
+   }
+  },
+  {
+   "file": "bol_08.pdf",
+   "scan": false,
+   "planted": "BOOKING_MISMATCH",
+   "expected_issues": [
+    "BOOKING_MISMATCH"
+   ],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "MAEU2609136",
+    "carrier_scac": "MAEU",
+    "shipper": "Pusan Precision Electronics Co., 221 Jungang-daero, Busan 48939, Korea",
+    "consignee": "Hamburg Tech Import GmbH, Am Sandtorkai 5, 20457 Hamburg, Germany",
+    "notify_party": "Hamburg Tech Import GmbH, Am Sandtorkai 5, 20457 Hamburg, Germany",
+    "vessel": "MAERSK KENSINGTON",
+    "voyage": "432W",
+    "pol": "KRPUS",
+    "pod": "DEHAM",
+    "container_numbers": [
+     "MSKU1730966",
+     "MSKU1740075",
+     "MSKU1749180"
+    ],
+    "seal_numbers": [
+     "SL870424",
+     "SL870431",
+     "SL870438"
+    ],
+    "package_count": 699,
+    "gross_weight_kg": 14000.1,
+    "description_of_goods": "Extra virgin olive oil in tins",
+    "hs_codes": [
+     "150910"
+    ],
+    "freight_terms": "collect",
+    "issue_date": "2026-09-18",
+    "booking_ref": "BKG770108",
+    "cargo_lines": [
+     {
+      "description": "Extra virgin olive oil in tins",
+      "hs_code": "150910",
+      "packages": 233,
+      "weight_kg": 4666.7
+     },
+     {
+      "description": "Extra virgin olive oil in tins",
+      "hs_code": "150910",
+      "packages": 233,
+      "weight_kg": 4666.7
+     },
+     {
+      "description": "Extra virgin olive oil in tins",
+      "hs_code": "150910",
+      "packages": 233,
+      "weight_kg": 4666.7
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770108",
+    "container_count": 3,
+    "pod": "DEHAM",
+    "consignee": "Pacific Rim Wholesale Partners Ltd.",
+    "booking_date": "2026-09-09"
+   }
+  },
+  {
+   "file": "bol_09.pdf",
+   "scan": false,
+   "planted": "WEIGHT_SUM",
+   "expected_issues": [
+    "WEIGHT_SUM"
+   ],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "MSCU2609153",
+    "carrier_scac": "MSCU",
+    "shipper": "Valencia Ceramica S.L., Calle del Puerto 12, 46024 Valencia, Spain",
+    "consignee": "Gulf Building Supplies LLC, Jebel Ali Free Zone, Dubai, UAE",
+    "notify_party": "Gulf Building Supplies LLC, Jebel Ali Free Zone, Dubai, UAE",
+    "vessel": "MSC GULSUN",
+    "voyage": "FE238",
+    "pol": "ESVLC",
+    "pod": "AEJEA",
+    "container_numbers": [
+     "MSCU1732337"
+    ],
+    "seal_numbers": [
+     "SL870477"
+    ],
+    "package_count": 1000,
+    "gross_weight_kg": 12500.0,
+    "description_of_goods": "New pneumatic rubber tyres for cars",
+    "hs_codes": [
+     "401110"
+    ],
+    "freight_terms": "prepaid",
+    "issue_date": "2026-09-19",
+    "booking_ref": "BKG770109",
+    "cargo_lines": [
+     {
+      "description": "New pneumatic rubber tyres for cars",
+      "hs_code": "401110",
+      "packages": 1000,
+      "weight_kg": 11000.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770109",
+    "container_count": 1,
+    "pod": "AEJEA",
+    "consignee": "Gulf Building Supplies LLC",
+    "booking_date": "2026-09-10"
+   }
+  },
+  {
+   "file": "bol_10.pdf",
+   "scan": true,
+   "planted": "LOW_CONFIDENCE_SCAN",
+   "expected_issues": [],
+   "expect_review": true,
+   "fields": {
+    "bol_number": "CMDU2609170",
+    "carrier_scac": "CMDU",
+    "shipper": "Ningbo Autoparts Manufacturing Ltd., 66 Beilun Road, Ningbo 315800, China",
+    "consignee": "Felixstowe Motor Spares Ltd., Dock Road, Felixstowe IP11 3QW, United Kingdom",
+    "notify_party": "Felixstowe Motor Spares Ltd., Dock Road, Felixstowe IP11 3QW, United Kingdom",
+    "vessel": "CMA CGM JACQUES SAADE",
+    "voyage": "0MX4LW1MA",
+    "pol": "CNNGB",
+    "pod": "GBFXT",
+    "container_numbers": [
+     "CMAU1733706",
+     "CMAU1742816"
+    ],
+    "seal_numbers": [
+     "SL870530",
+     "SL870537"
+    ],
+    "package_count": 500,
+    "gross_weight_kg": 12500.0,
+    "description_of_goods": "Photovoltaic solar panels",
+    "hs_codes": [
+     "854143"
+    ],
+    "freight_terms": "collect",
+    "issue_date": "2026-09-20",
+    "booking_ref": "BKG770110",
+    "cargo_lines": [
+     {
+      "description": "Photovoltaic solar panels",
+      "hs_code": "854143",
+      "packages": 250,
+      "weight_kg": 6250.0
+     },
+     {
+      "description": "Photovoltaic solar panels",
+      "hs_code": "854143",
+      "packages": 250,
+      "weight_kg": 6250.0
+     }
+    ]
+   },
+   "booking": {
+    "booking_ref": "BKG770110",
+    "container_count": 2,
+    "pod": "GBFXT",
+    "consignee": "Felixstowe Motor Spares Ltd.",
+    "booking_date": "2026-09-11"
+   }
+  }
+ ]
+}

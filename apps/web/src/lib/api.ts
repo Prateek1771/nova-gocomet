@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { env } from "./env";
@@ -26,6 +27,16 @@ export async function apiGet<T>(path: string): Promise<T> {
     throw new ApiError(res.status, body?.error?.code ?? "error", body?.error?.message ?? res.statusText);
   }
   return (await res.json()) as T;
+}
+
+/** A detail read where "not found" (incl. another tenant's id under RLS) renders the 404 page. */
+export async function apiGetOrNotFound<T>(path: string): Promise<T> {
+  try {
+    return await apiGet<T>(path);
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 422)) notFound();
+    throw e;
+  }
 }
 
 export type Me = {

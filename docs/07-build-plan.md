@@ -137,29 +137,29 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
 **Goal:** the first full vertical slice: upload → extract → validate → review → push.
 
 ### Tasks
-- [ ] Synthetic BoL generator (reportlab): 10 BoLs with the planted errors in [04 W1](04-workflow-specs.md#w1--bill-of-lading-intake), plus a manifest.
-- [ ] `POST /documents`: MinIO `tenant/{id}/`, sha256 dedupe, MIME + magic-byte + size/page limits, auto-trigger from `DocType.default_workflow`.
-- [ ] `governed_agent` template (5 stages) + `run_agent` activity with Langfuse callback (FR-2.1).
-- [ ] `doc_extractor`: pdfplumber text layer → `nova-extract-text`; vision only for pages with no text; value→bbox matching (ADR-016).
-- [ ] `bol_validator`: check registry codes + `SEMANTIC_GOODS` via `nova-reason`.
-- [ ] `decide` node → `nova-decide` (Jev) with fallback, then human task (FR-2.5).
-- [ ] LiteLLM configs `local` / `cheap` / `demo`; Redis cache; global `max_budget`.
-- [ ] Inbox + `bol_review` micro-app: DocumentViewer (bbox overlay) + FieldForm + DecisionBar.
-- [ ] `tms.upsert_shipment` mock action.
-- [ ] Jev eval set (~40 labelled yes/no questions from the seed).
-- [ ] **Spike:** React Flow ↔ YAML `parseDocument()` round-trip.
+- [x] Synthetic BoL generator (reportlab): 10 BoLs with the planted errors in [04 W1](04-workflow-specs.md#w1--bill-of-lading-intake), plus a manifest (`scripts/gen_bols.py`, seed in `definitions/seed/bol_cases.json`).
+- [x] `POST /documents`: MinIO `tenant/{id}/`, sha256 dedupe, MIME + magic-byte + size/page limits, auto-trigger from `DocType.default_workflow`.
+- [x] `governed_agent` template (5 stages) + `run_agent` activity (FR-2.1). Langfuse callback waits for the M4 `ai` profile; LLM calls are OTel spans in Jaeger meanwhile.
+- [x] `doc_extractor`: pdfplumber text layer → `nova-extract-text`; vision only for pages with no text; value→bbox matching (ADR-016, ADR-022).
+- [x] `bol_validator`: check registry codes + `SEMANTIC_GOODS` via `nova-reason`.
+- [x] `decide` node → Jev decisions API (criteria + threshold in the definition) → chat fallback → human task (FR-2.5, ADR-022).
+- [x] LiteLLM configs `local` / `cheap` / `demo`; Redis cache; global `max_budget` (enforced once LiteLLM gets its DB in M4).
+- [x] Inbox + `bol_review` micro-app: DocumentViewer (bbox overlay) + FieldForm + DecisionBar (+ IssueList; Documents, Runs and Overview screens; keyboard j/k/Enter, a/r).
+- [x] `tms.upsert_shipment` mock action (actions now receive their request context).
+- [x] Jev eval set (~40 labelled yes/no questions from the seed): `tests/evals/decide_bol.jsonl`, 20 true / 20 false.
+- [x] **Spike:** React Flow ↔ YAML `parseDocument()` round-trip. Re-serialising isn't byte-preserving; edits splice source ranges instead ([ADR-023](06-adrs.md#adr-023-studio-edits-yaml-by-splicing-source-ranges-not-by-re-serialising), `features/studio/yaml-graph.ts`).
 
 ### Tests
-- [ ] Unit: each check code against its planted error and against a clean doc.
-- [ ] VCR-recorded LLM tests for extractor/validator; bbox match test set (dates/numbers reformatted).
-- [ ] Langfuse eval baseline: per-field F1, validator recall.
-- [ ] Injection red-team v1: 10 adversarial BoLs → zero unauthorised state changes.
-- [ ] PII redaction verified in logs and traces.
+- [x] Unit: each check code against its planted error and against a clean doc (`tests/unit/test_agents.py`).
+- [x] Recorded/faked LLM tests for extractor, validator and decide (httpx MockTransport, no live calls); bbox match test set incl. reformatted dates/numbers; W1 end to end on real Postgres + Temporal with only the model faked (`tests/integration/test_w1_documents.py`).
+- [x] Eval baseline (`make bench-llm` → `docs/evals/m2-baseline.json`; Langfuse datasets join in M4): extraction micro F1 0.994, validator recall 1.0 with 0 false alarms, decide accuracy 0.90 (misses are all DATE_ORDER, which routes deterministically).
+- [x] Injection red-team v1 (`make redteam`): 10 adversarial BoLs → zero unauthorised state changes (no injected value reached a shipment; every planted error still reached a human). 1/10 attacks still poisons extraction (a "real consignee is…" remark) and is caught by the deterministic booking check.
+- [x] PII redaction verified in logs (structlog `redact_pii`, test in `test_hardening.py`); traces carry ids, aliases, cost and token counts only, never document content.
 
 ### Exit criteria
-- [ ] Upload → extract → review → approve → mock TMS works in the UI.
-- [ ] 4 clean BoLs complete touchless; all 6 planted issues produce a human task with the right evidence highlighted.
-- [ ] Eval baseline recorded; `make bench-llm` timings recorded for `cheap`.
+- [x] Upload → extract → review → approve → mock TMS works in the UI (headed Playwright walkthrough, 2026-10-09).
+- [x] 4 clean BoLs complete touchless; all 6 planted issues produce a human task with the right evidence highlighted (live, `cheap` mode).
+- [x] Eval baseline recorded; `make bench-llm` timings for `cheap`: extraction p50 2.5 s / p95 9.7 s, decide (Jev) p50 0.8 s / p95 1.0 s, full BoL run 2-8 s, ≤ $0.0004 per BoL.
 
 ---
 

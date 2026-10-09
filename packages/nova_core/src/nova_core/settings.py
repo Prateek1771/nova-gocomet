@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     openfga_url: str = "http://localhost:8081"
     temporal_host: str = "localhost:7233"
     otel_exporter_otlp_endpoint: str = ""
+    # object storage (MinIO / any S3); keys are always tenant/{tenant_id}/...
+    s3_endpoint: str = "localhost:9100"
+    s3_access_key: str = "nova"
+    s3_secret_key: str = "nova-dev-secret"  # noqa: S105 (dev default; env overrides)
+    s3_bucket: str = "nova"
+    s3_secure: bool = False
+    # LiteLLM proxy (OpenAI-compatible); code only names aliases (CLAUDE.md rule 6)
+    llm_base_url: str = "http://localhost:4100"
+    llm_api_key: str = "sk-nova-dev"
+    llm_mode: str = "cheap"  # local | cheap | demo (picks the LiteLLM config; local = no cloud calls)
+    # decisions-model id for the gateway's /jev/decisions pass-through; config, not code (rule 6)
+    jev_model: str = ""
+    max_upload_mb: int = 20
+    max_pages: int = 20
     log_level: str = "INFO"
 
     @property

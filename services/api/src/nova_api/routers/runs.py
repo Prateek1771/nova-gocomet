@@ -35,6 +35,10 @@ class RunOut(BaseModel):
     input: dict[str, Any]
     started_at: str
     ended_at: str | None
+    cost_usd: float = 0.0
+    subject_type: str | None = None
+    subject_id: str | None = None
+    temporal_workflow_id: str | None = None
 
 
 class StepOut(BaseModel):
@@ -60,7 +64,7 @@ class RunDetail(RunOut):
 
 
 _RUN = """select r.id, d.key, d.version, r.config_version, r.status, r.input, r.started_at, r.ended_at,
-                 r.temporal_workflow_id
+                 r.temporal_workflow_id, r.cost_usd, r.subject_type, r.subject_id
           from workflow_runs r join workflow_definitions d on d.id = r.definition_id"""
 
 
@@ -74,39 +78,53 @@ def _run(r: Any) -> dict[str, Any]:
         "input": r.input,
         "started_at": r.started_at.isoformat(),
         "ended_at": r.ended_at.isoformat() if r.ended_at else None,
+        "cost_usd": float(r.cost_usd or 0),
+        "subject_type": r.subject_type,
+        "subject_id": r.subject_id,
+        "temporal_workflow_id": r.temporal_workflow_id,
     }
 
 
-@router.post("", status_code=201)
-async def start(c: TenantDep, body: StartIn) -> RunOut:
-    await authorize(c, "can_start", f"workflow:{c.tenant_id}/{body.workflow_key}")
-    subject = (body.subject_type, body.subject_id) if body.subject_type and body.subject_id else None
-    async with db.tenant_session(c.tenant_id) as s:
+async def launch(
+    tenant_id: uuid.UUID,
+    key: str,
+    input: dict[str, Any],
+    version: int | None = None,
+    subject: tuple[str, str] | None = None,
+) -> uuid.UUID:
+    """Create the projection row and start NovaWorkflow. Shared by POST /runs and document uploads."""
+    async with db.tenant_session(tenant_id) as s:
         try:
-            run = await create_run(
-                s, c.tenant_id, body.workflow_key, body.input, body.version, subject=subject
-            )
+            run = await create_run(s, tenant_id, key, input, version, subject=subject)
         except LookupError as e:
             raise HTTPException(404, str(e)) from e
     req = {
         "run_id": str(run.run_id),
-        "tenant_id": str(c.tenant_id),
+        "tenant_id": str(tenant_id),
         "definition_id": str(run.definition_id),
         "config_version": run.config_version,
-        "input": body.input,
+        "input": input,
     }
     try:
         client = await t.client()
         await client.start_workflow(t.WORKFLOW, req, id=run.workflow_id, task_queue=t.ENGINE_QUEUE)
     except Exception as e:
         log.exception("start_workflow failed", run_id=str(run.run_id))
-        async with db.tenant_session(c.tenant_id) as s:
+        async with db.tenant_session(tenant_id) as s:
             await s.execute(
                 text("update workflow_runs set status = 'failed', ended_at = now() where id = :r"),
                 {"r": run.run_id},
             )
         raise HTTPException(503, "workflow engine unavailable") from e
-    return await get_run(c, run.run_id)
+    return run.run_id
+
+
+@router.post("", status_code=201)
+async def start(c: TenantDep, body: StartIn) -> RunOut:
+    await authorize(c, "can_start", f"workflow:{c.tenant_id}/{body.workflow_key}")
+    subject = (body.subject_type, body.subject_id) if body.subject_type and body.subject_id else None
+    run_id = await launch(c.tenant_id, body.workflow_key, body.input, body.version, subject)
+    return await get_run(c, run_id)
 
 
 @router.get("")

@@ -3,6 +3,10 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from nova_core.temporal import AgentRequest
+
+__all__ = ["AgentRequest"]  # re-exported: the contract moved to nova_core (shared with agents)
+
 
 @dataclass
 class RunRequest:
@@ -75,17 +79,6 @@ class ActionRequest:
     node_id: str
     idempotency_key: str
     action: str
-    params: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class AgentRequest:
-    """Contract with agents-worker (M2): `run_agent` / `decide` activities on AGENTS_QUEUE."""
-
-    tenant_id: str
-    run_id: str
-    node_id: str
-    name: str  # agent name, or "decide"
     params: dict[str, Any] = field(default_factory=dict)
 
 

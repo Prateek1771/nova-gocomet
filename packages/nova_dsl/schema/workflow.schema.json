@@ -196,6 +196,26 @@
       "title": "Case",
       "type": "object"
     },
+    "Criteria": {
+      "additionalProperties": false,
+      "description": "What a yes and a no mean, in the domain's words (Jev `noul` criteria, LLD \u00a73.4).",
+      "properties": {
+        "true": {
+          "title": "True",
+          "type": "string"
+        },
+        "false": {
+          "title": "False",
+          "type": "string"
+        }
+      },
+      "required": [
+        "true",
+        "false"
+      ],
+      "title": "Criteria",
+      "type": "object"
+    },
     "DecideNode": {
       "additionalProperties": false,
       "properties": {
@@ -611,6 +631,24 @@
         "context": {
           "default": null,
           "title": "Context"
+        },
+        "criteria": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Criteria"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "threshold": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Threshold",
+          "type": "number"
         }
       },
       "required": [

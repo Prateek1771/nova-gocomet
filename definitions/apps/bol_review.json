@@ -1,0 +1,27 @@
+{
+  "key": "bol_review",
+  "title": "Bill of Lading review",
+  "layout": {
+    "type": "split",
+    "children": [
+      {"type": "DocumentViewer", "bind": {"document_id": "$.document_id", "evidence": "$.evidence", "issues": "$.issues"}},
+      {"type": "stack", "children": [
+        {"type": "IssueList", "bind": {"issues": "$.issues", "why": "$.why"}},
+        {"type": "FieldForm", "schema": "bol_v1", "bind": {"fields": "$.fields", "confidence": "$.confidence", "evidence": "$.evidence"}},
+        {"type": "DecisionBar", "options": ["approved", "rejected"], "requireReasonFor": ["rejected"]}
+      ]}
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["decision"],
+    "additionalProperties": false,
+    "properties": {
+      "decision": {"enum": ["approved", "rejected"]},
+      "reason": {"type": "string", "maxLength": 2000},
+      "fields": {"type": "object"}
+    },
+    "if": {"properties": {"decision": {"const": "rejected"}}},
+    "then": {"required": ["decision", "reason"]}
+  }
+}

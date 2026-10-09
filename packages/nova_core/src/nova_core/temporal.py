@@ -1,6 +1,7 @@
 """Temporal names shared by the API (client) and the engine (worker). Services can't import each
 other, so the contract lives here and the API addresses the workflow by name."""
 
+from dataclasses import dataclass, field
 from typing import Any
 
 import structlog
@@ -14,6 +15,19 @@ ENGINE_QUEUE = "nova-engine"
 AGENTS_QUEUE = "nova-agents"  # agent / decide activities (agents-worker, M2)
 WORKFLOW = "NovaWorkflow"
 CLAIM_TASK, COMPLETE_TASK, EVENT = "claim_task", "complete_task", "event"
+
+
+@dataclass
+class AgentRequest:
+    """Engine -> agents-worker contract: `run_agent` / `decide` activities on AGENTS_QUEUE. Lives here
+    because the two services can't import each other."""
+
+    tenant_id: str
+    run_id: str
+    node_id: str
+    name: str  # agent name, or "decide"
+    params: dict[str, Any] = field(default_factory=dict)
+
 
 _client: Client | None = None
 

@@ -82,3 +82,25 @@ async def test_activity_logs_carry_run_context() -> None:
     )
     assert got == {"tenant_id": "t1", "run_id": "r1", "node_id": "n1"}
     assert structlog.contextvars.get_contextvars() == {}  # unbound after the activity
+
+
+def test_pii_is_redacted_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
+    import json as _json
+
+    from nova_core.logging import configure_logging
+
+    configure_logging("INFO")
+    structlog.get_logger().info(
+        "notify",
+        run_id="r1",
+        consignee="Hamburg Tech Import GmbH",
+        params={"fields": {"consignee": "x"}, "bol_number": "MAEU1"},
+        issues=[{"code": "BOOKING_MISMATCH", "shipper": "Acme"}],
+    )
+    line = _json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line["consignee"] == "[redacted]" and line["params"]["fields"] == "[redacted]"
+    assert line["params"]["bol_number"] == "MAEU1" and line["issues"][0] == {
+        "code": "BOOKING_MISMATCH",
+        "shipper": "[redacted]",
+    }
+    assert "Hamburg" not in _json.dumps(line)

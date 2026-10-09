@@ -2,7 +2,7 @@
 
 Nova is GoComet's governed AI platform for enterprise logistics. This repo is a working prototype of it: a generic YAML workflow engine on Temporal, governed LangGraph agents, micro-apps for human steps, and a tenant-isolated data layer. It runs three workflows: W1 BoL intake, W2 invoice ↔ PO match + approval, and W3 shipment exception monitoring. The source brief is `note.md`.
 
-**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS) and M1 (DSL, generic Temporal interpreter, workflow/run/task API, data-profile spike) are done. Next: M2 (W1 BoL slice). Tick tasks in 07 as they land.
+**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS), M1 (DSL, generic Temporal interpreter, workflow/run/task API) and M2 (W1 BoL slice: uploads, governed agents, Jev decide, inbox + bol_review micro-app, evals) are done. Next: M3 (Studio). Tick tasks in 07 as they land.
 
 ## Docs (read before changing anything)
 
@@ -46,9 +46,9 @@ Next.js (App Router) + React 19 + React Flow + shadcn/Tailwind v4 · FastAPI · 
 
 ## Commands
 
-`make up` (core stack) · `make down` · `make seed` · `make test` (unit + Temporal time-skipping engine tests, 100% branch gate) · `make test-int` (testcontainers) · `make lint` · `make gen` (DSL schema, OpenAPI, web TS types; CI fails on drift) · `make ci`. Coming later: `make up-full`, `make up-local`, `make demo`. No `make` on Windows: `winget install ezwinports.make`, or run the Makefile lines directly.
+`make up` (core stack) · `make down` · `make seed` · `make test` (unit + Temporal time-skipping engine tests, 100% branch gate) · `make test-int` (testcontainers) · `make lint` · `make gen` (DSL schema, OpenAPI, web TS types; CI fails on drift) · `make ci`. `make bols` (seed BoL PDFs) · `make bench-llm` (live eval → `docs/evals/`) · `make redteam` (injection suite, live). Coming later: `make up-full`, `make up-local`, `make demo`. No `make` on Windows: `winget install ezwinports.make`, or run the Makefile lines directly.
 
-Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Jaeger traces <http://localhost:16686> · Postgres 5433. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
+Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Jaeger traces <http://localhost:16686> · LiteLLM 4100 (key `sk-nova-dev`) · MinIO 9100, console 9101 (nova/nova-dev-secret) · Postgres 5433. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
 
 ## Conventions
 

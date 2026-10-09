@@ -15,6 +15,9 @@ export const env = {
   clientSecret: req("OIDC_CLIENT_SECRET", "nova-web-dev-secret"),
   apiUrl: req("NOVA_API_URL", "http://localhost:8100"),
   redisUrl: req("REDIS_URL", "redis://localhost:6379"),
+  // operator consoles linked from the run view (dev defaults; set per environment)
+  temporalUiUrl: req("TEMPORAL_UI_URL", "http://localhost:8233"),
+  jaegerUiUrl: req("JAEGER_UI_URL", "http://localhost:16686"),
 };
 
 export const secureCookies = env.appUrl.startsWith("https://");

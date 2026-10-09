@@ -1,18 +1,10 @@
 import { redirect } from "next/navigation";
 
-import { ApiError, getMe } from "@/lib/api";
+import { Nav } from "@/components/nav";
+import { ApiError, apiGet, getMe } from "@/lib/api";
+import type { TaskOut } from "@/lib/types";
 import { currentSession } from "@/lib/session";
 
-// nav lands milestone by milestone; items render disabled until their screen exists
-const NAV = [
-  { label: "Home", href: "/", m: null },
-  { label: "Inbox", href: "/inbox", m: "M1" },
-  { label: "Runs", href: "/runs", m: "M1" },
-  { label: "Studio", href: "/studio", m: "M3" },
-  { label: "Documents", href: "/documents", m: "M2" },
-  { label: "Exceptions", href: "/exceptions", m: "M6" },
-  { label: "Admin", href: "/admin", m: "M4" },
-];
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (!(await currentSession())) redirect("/api/auth/login");
@@ -25,6 +17,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     return <AccessProblem message={e instanceof ApiError ? e.message : "Nova API is unreachable"} />;
   }
 
+  const openTasks = me.tenant ? await apiGet<TaskOut[]>("/tasks").then((t) => t.length).catch(() => 0) : 0;
   const initials = (me.name ?? me.email ?? "?")
     .split(/\s+/)
     .map((w) => w[0])
@@ -34,27 +27,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-screen bg-canvas text-ink">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-panel px-3 py-5 md:flex">
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-line bg-panel px-3 py-5 md:flex">
         <div className="flex items-center gap-2 px-2">
           <span className="grid size-8 place-items-center rounded-lg bg-linear-to-br from-indigo-500 to-cyan-400 text-sm font-bold text-white">
             N
           </span>
           <span className="text-lg font-semibold tracking-tight">Nova</span>
         </div>
-        <nav className="mt-8 flex flex-col gap-0.5">
-          {NAV.map((n) =>
-            n.m ? (
-              <span key={n.href} className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted" title={`Arrives in ${n.m}`}>
-                {n.label}
-                <span className="rounded border border-line px-1.5 text-[10px] font-medium">{n.m}</span>
-              </span>
-            ) : (
-              <a key={n.href} href={n.href} className="rounded-md bg-accent-soft px-2 py-1.5 text-sm font-medium text-accent">
-                {n.label}
-              </a>
-            ),
-          )}
-        </nav>
+        <Nav openTasks={openTasks} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -75,7 +55,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             </form>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-8">{children}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );
@@ -88,7 +68,7 @@ function AccessProblem({ message }: { message: string }) {
         <h1 className="text-lg font-semibold">Can&apos;t open Nova</h1>
         <p className="mt-2 text-sm text-muted">{message}</p>
         <form action="/api/auth/logout" method="post" className="mt-4">
-          <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white">Sign in as someone else</button>
+          <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent">Sign in as someone else</button>
         </form>
       </div>
     </div>

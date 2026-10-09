@@ -7,6 +7,7 @@ Run: uv run python -m nova_api.seed
 import asyncio
 import json
 import os
+from datetime import date
 from pathlib import Path
 
 from sqlalchemy import text
@@ -54,6 +55,28 @@ async def publish_definitions(c: AsyncConnection, tid: object, slug: str) -> Non
         print(f"  published {slug}/{key} v{wf.metadata.version}")
 
 
+async def seed_bookings(c: AsyncConnection, tid: object) -> None:
+    """Booking master data the BoL validator checks against (BOOKING_MISMATCH, DATE_ORDER)."""
+    cases = json.loads((DEFINITIONS / "seed" / "bol_cases.json").read_text(encoding="utf-8"))["cases"]
+    for b in (case["booking"] for case in cases):
+        await c.execute(
+            text("""insert into bookings
+                      (tenant_id, booking_ref, container_count, pod, consignee, booking_date)
+                    values (:t, :r, :n, :pod, :c, :d)
+                    on conflict (tenant_id, booking_ref) do update set
+                      container_count = excluded.container_count, pod = excluded.pod,
+                      consignee = excluded.consignee, booking_date = excluded.booking_date"""),
+            {
+                "t": tid,
+                "r": b["booking_ref"],
+                "n": b["container_count"],
+                "pod": b["pod"],
+                "c": b["consignee"],
+                "d": date.fromisoformat(b["booking_date"]),
+            },
+        )
+
+
 async def main() -> None:
     engine = create_async_engine(get_settings().migrations_database_url)
     async with engine.begin() as c:
@@ -68,7 +91,12 @@ async def main() -> None:
             ).scalar_one()
             # owner is subject to RLS too (FORCE), so scope the rest to the tenant
             await c.execute(text("select set_config('app.tenant_id', :t, true)"), {"t": str(tid)})
-            config = {"currency": "USD", "approval_limits": limits, "auto_approve_below": 1000}
+            config = {
+                "currency": "USD",
+                "approval_limits": limits,
+                "auto_approve_below": 1000,
+                "bol_min_confidence": 0.85,  # W1: below this, extraction goes to human review
+            }
             # only the seed's own v1 is ever rewritten; published versions stay immutable
             await c.execute(
                 text("""
@@ -79,6 +107,7 @@ async def main() -> None:
                 {"t": tid, "c": json.dumps(config)},
             )
             print(f"seeded {slug} ({tid})")
+            await seed_bookings(c, tid)
             await publish_definitions(c, tid, slug)
     await engine.dispose()
 

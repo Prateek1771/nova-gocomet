@@ -178,7 +178,7 @@ async def run_action(r: ActionRequest) -> Any:
     # ponytail: two attempts racing past this point would both run the action; Temporal runs one
     # attempt at a time, so add `select … for update skip locked` only if that ever changes
     try:
-        response = await ACTIONS[r.action](r.params)
+        response = await ACTIONS[r.action](r.params, r)
     except KeyError as e:
         raise ApplicationError(str(e), non_retryable=True) from e
     except Exception:

@@ -4,10 +4,19 @@
   --canvas: #f6f7f9;
   --panel: #ffffff;
   --ink: #0f172a;
-  --muted: #64748b;
+  --muted: #556070;
   --line: #e2e8f0;
   --accent: #4f46e5;
   --accent-soft: #eef2ff;
+  --on-accent: #ffffff;
+  --ok: #047857;
+  --ok-soft: #ecfdf5;
+  --warn: #a14a07;
+  --warn-soft: #fffbeb;
+  --bad: #b91c1c;
+  --bad-soft: #fef2f2;
+  --info: #0369a1;
+  --info-soft: #f0f9ff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +28,15 @@
     --line: #1f2937;
     --accent: #818cf8;
     --accent-soft: #1e1b4b;
+    --on-accent: #0b0f17; /* the dark-mode accent is light: dark text keeps >= 4.5:1 */
+    --ok: #34d399;
+    --ok-soft: #052e22;
+    --warn: #fbbf24;
+    --warn-soft: #2a1d05;
+    --bad: #f87171;
+    --bad-soft: #2a0f0f;
+    --info: #38bdf8;
+    --info-soft: #082033;
   }
 }
 
@@ -30,6 +48,15 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -38,3 +65,7 @@ body {
   background: var(--canvas);
   color: var(--ink);
 }
+
+/* tabular numbers everywhere data is compared */
+.num { font-variant-numeric: tabular-nums; }
+::selection { background: var(--accent-soft); }

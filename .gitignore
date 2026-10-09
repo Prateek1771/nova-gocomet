@@ -10,3 +10,4 @@ node_modules/
 .next/
 apps/web/next-env.d.ts
 *.tsbuildinfo
+data/

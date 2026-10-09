@@ -14,10 +14,11 @@ nova-core = { workspace = true }
 nova-dsl = { workspace = true }
 nova-api = { workspace = true }
 nova-engine = { workspace = true }
+nova-agents = { workspace = true }
 
 [dependency-groups]
 dev = [
-  "nova-core", "nova-dsl", "nova-api", "nova-engine", "hypothesis>=6.115", "types-pyyaml", "coverage>=7.6",
+  "nova-core", "nova-dsl", "nova-api", "nova-engine", "nova-agents", "reportlab>=4.2", "hypothesis>=6.115", "types-pyyaml", "types-jsonschema", "coverage>=7.6",
   "ruff>=0.7", "mypy>=1.13", "pytest>=8", "pytest-asyncio>=0.24",
   "import-linter>=2.1", "testcontainers[postgres,keycloak]>=4.8", "cryptography>=43",
   "pip-audit>=2.7",
@@ -33,20 +34,20 @@ select = ["E", "F", "I", "UP", "B", "S", "ASYNC"]
 ignore = ["S101"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["nova_core", "nova_dsl", "nova_api", "nova_engine"]
+known-first-party = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106", "E501"]
-"scripts/**" = ["S107"]
+"scripts/**" = ["S107", "S603", "S607", "S608"]  # dev tools: local subprocess + constant SQL
 "services/api/src/nova_api/migrations/**" = ["E501"]
 
 [tool.mypy]
 strict = true
-packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine"]
+packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "celpy.*", "lark.*"]
+module = ["testcontainers.*", "celpy.*", "lark.*", "pdfplumber.*", "pypdfium2.*", "reportlab.*", "minio.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -66,19 +67,19 @@ fail_under = 100
 show_missing = true
 
 [tool.importlinter]
-root_packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine"]
+root_packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "packages never import services"
 type = "forbidden"
 source_modules = ["nova_core", "nova_dsl"]
-forbidden_modules = ["nova_api", "nova_engine"]
+forbidden_modules = ["nova_api", "nova_engine", "nova_agents"]
 
 [[tool.importlinter.contracts]]
 name = "services never import each other"
 type = "independence"
-modules = ["nova_api", "nova_engine"]
+modules = ["nova_api", "nova_engine", "nova_agents"]
 
 [[tool.importlinter.contracts]]
 name = "nova_dsl has no I/O"

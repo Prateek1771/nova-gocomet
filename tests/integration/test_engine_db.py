@@ -156,7 +156,7 @@ async def test_idempotent_action(stack: dict[str, Any]) -> None:
     if "test.count" not in ACTIONS:
 
         @ACTIONS.register("test.count")
-        async def count(params: dict[str, Any]) -> dict[str, Any]:
+        async def count(params: dict[str, Any], ctx: ActionRequest) -> dict[str, Any]:
             calls.append(params)
             return {"n": len(calls)}
 

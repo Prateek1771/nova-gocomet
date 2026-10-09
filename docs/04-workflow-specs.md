@@ -23,6 +23,8 @@ YAML: see [LLD §2.1](03-lld.md#21-shape). That example *is* `definitions/workfl
 
 **Extraction schema `bol_v1`:** bol_number, carrier_scac, shipper, consignee, notify_party, vessel, voyage, pol (UN/LOCODE), pod, container_numbers[], seal_numbers[], package_count, gross_weight_kg, description_of_goods, hs_codes[], freight_terms (prepaid/collect), issue_date, booking_ref.
 
+Built in M2 ([ADR-022](06-adrs.md#adr-022-w1-build-decisions-bbox-schema-reference-data-llm-routing-jev-decisions-api)): the schema also has `cargo_lines[{description, hs_code, packages, weight_kg}]`; bookings are seeded master data; the seed set is `definitions/seed/bol_cases.json`, rendered by `scripts/gen_bols.py`. The decide question carries Jev criteria and threshold 0.4; high- and medium-severity issues go to review without asking a model, so the model only judges low-severity residue.
+
 **Validator checks (deterministic first):**
 
 | Code | Check | Severity |

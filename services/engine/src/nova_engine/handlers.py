@@ -82,10 +82,23 @@ async def agent(w: "NovaWorkflow", node: AgentNode, s: Step) -> Any:
 @HANDLERS.register("decide")
 async def decide(w: "NovaWorkflow", node: DecideNode, s: Step) -> Any:
     act = w.activation()
-    questions = [{"id": q.id, "ask": q.ask, "context": cel.render(q.context, act)} for q in node.questions]
+    questions = [
+        {
+            "id": q.id,
+            "ask": q.ask,
+            "context": cel.render(q.context, act),
+            "criteria": q.criteria.model_dump() if q.criteria else None,
+            "threshold": q.threshold,
+        }
+        for q in node.questions
+    ]
     req = AgentRequest(w.req.tenant_id, w.req.run_id, node.id, "decide", {"questions": questions})
     return await workflow.execute_activity(
-        "decide", req, task_queue=AGENTS_QUEUE, start_to_close_timeout=node.timeout or DEFAULT_TIMEOUT
+        "decide",
+        req,
+        task_queue=AGENTS_QUEUE,
+        start_to_close_timeout=node.timeout or DEFAULT_TIMEOUT,
+        retry_policy=RetryPolicy(maximum_attempts=3),  # fallback model + human task live in the activity
     )
 
 

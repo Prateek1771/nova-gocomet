@@ -35,6 +35,9 @@ export type Type2 = "decide";
 export type Questions = [Question, ...Question[]];
 export type Id2 = string;
 export type Ask = string;
+export type True = string;
+export type False = string;
+export type Threshold = number;
 export type Id3 = string;
 export type Title3 = string | null;
 export type Timeout2 = string | null;
@@ -148,9 +151,18 @@ export interface Question {
   id: Id2;
   ask: Ask;
   context?: Context;
+  criteria?: Criteria | null;
+  threshold?: Threshold;
 }
 export interface Context {
   [k: string]: unknown;
+}
+/**
+ * What a yes and a no mean, in the domain's words (Jev `noul` criteria, LLD §3.4).
+ */
+export interface Criteria {
+  true: True;
+  false: False;
 }
 export interface RuleNode {
   id: Id3;

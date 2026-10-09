@@ -45,10 +45,21 @@ class AgentNode(_Node):
     retry: Retry | None = None
 
 
+class Criteria(_Base):
+    """What a yes and a no mean, in the domain's words (Jev `noul` criteria, LLD §3.4)."""
+
+    true: str
+    false: str
+
+
 class Question(_Base):
     id: NodeId
     ask: str
     context: Any = None
+    criteria: Criteria | None = None
+    # P(yes) at or above this answers yes. Set it from the cost of each kind of mistake: a low
+    # threshold sends more to humans, a high one lets more through.
+    threshold: float = Field(0.5, ge=0, le=1)
 
 
 class DecideNode(_Node):

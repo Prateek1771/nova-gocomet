@@ -6,12 +6,15 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from jsonschema import Draft202012Validator
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from temporalio.client import RPCTimeoutOrCancelledError, WorkflowUpdateFailedError
 from temporalio.service import RPCError, RPCStatusCode
 
+from nova_api import definitions
 from nova_api.authz import TenantDep, authorize
+from nova_api.errors import ApiError
 from nova_core import db
 from nova_core import temporal as t
 
@@ -114,8 +117,44 @@ async def claim(c: TenantDep, task_id: uuid.UUID) -> TaskOut:
     return await _update(c, task_id, t.CLAIM_TASK, [])
 
 
+@router.get("/{task_id}")
+async def get_task(c: TenantDep, task_id: uuid.UUID) -> TaskOut:
+    await authorize(c, "can_view", f"task:{task_id}")
+    async with db.tenant_session(c.tenant_id) as s:
+        q = text(f"select {_COLS} from human_tasks where id = :id")  # noqa: S608
+        r = (await s.execute(q, {"id": task_id})).one_or_none()
+    if r is None:
+        raise HTTPException(404, "task not found")
+    return _task(r)
+
+
+def check_output(app_key: str, decision: str, payload: dict[str, Any]) -> None:
+    """FR-3.3: the app's output_schema is the contract; the UI is never trusted to enforce it."""
+    try:
+        schema = definitions.app(app_key).get("output_schema")
+    except HTTPException:
+        return  # apps without a definition (generic_review) only get the engine's outputs check
+    if not schema:
+        return
+    errors = sorted(Draft202012Validator(schema).iter_errors({"decision": decision, **payload}), key=str)
+    if errors:
+        raise ApiError(
+            422,
+            "invalid_task_output",
+            "task output doesn't match the app's output_schema",
+            [{"path": "/".join(map(str, e.absolute_path)), "message": e.message} for e in errors],
+        )
+
+
 @router.post("/{task_id}/complete")
 async def complete(c: TenantDep, task_id: uuid.UUID, body: CompleteIn) -> TaskOut:
     # M4: context={"amount": …} so OpenFGA `within_limit` checks the TenantConfig approval limit
     await authorize(c, "can_complete", f"task:{task_id}")
+    async with db.tenant_session(c.tenant_id) as s:
+        app_key = (
+            await s.execute(text("select app_key from human_tasks where id = :id"), {"id": task_id})
+        ).scalar()
+    if app_key is None:
+        raise HTTPException(404, "task not found")
+    check_output(app_key, body.decision, body.payload)
     return await _update(c, task_id, t.COMPLETE_TASK, [body.decision, body.payload])

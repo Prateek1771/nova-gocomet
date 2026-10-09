@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bol_v1",
+  "title": "Bill of Lading v1 (docs/04 W1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bol_number", "shipper", "consignee", "pol", "pod", "container_numbers", "gross_weight_kg"],
+  "properties": {
+    "bol_number": {"type": "string", "description": "B/L number"},
+    "carrier_scac": {"type": ["string", "null"], "description": "4-letter carrier SCAC code"},
+    "shipper": {"type": "string", "description": "shipper name and address"},
+    "consignee": {"type": "string", "description": "consignee name and address"},
+    "notify_party": {"type": ["string", "null"]},
+    "vessel": {"type": ["string", "null"]},
+    "voyage": {"type": ["string", "null"]},
+    "pol": {"type": "string", "description": "port of loading as 5-letter UN/LOCODE"},
+    "pod": {"type": "string", "description": "port of discharge as 5-letter UN/LOCODE"},
+    "container_numbers": {"type": "array", "items": {"type": "string"}, "description": "ISO 6346, e.g. MSKU1234565"},
+    "seal_numbers": {"type": "array", "items": {"type": "string"}},
+    "package_count": {"type": ["integer", "null"]},
+    "gross_weight_kg": {"type": "number"},
+    "description_of_goods": {"type": ["string", "null"]},
+    "hs_codes": {"type": "array", "items": {"type": "string"}},
+    "freight_terms": {"enum": ["prepaid", "collect", null]},
+    "issue_date": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "YYYY-MM-DD"},
+    "booking_ref": {"type": ["string", "null"]},
+    "cargo_lines": {
+      "type": "array",
+      "description": "one row per container line in the cargo table",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {"type": ["string", "null"]},
+          "hs_code": {"type": ["string", "null"]},
+          "packages": {"type": ["integer", "null"]},
+          "weight_kg": {"type": ["number", "null"]}
+        }
+      }
+    }
+  }
+}

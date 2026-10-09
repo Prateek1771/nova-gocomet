@@ -1,5 +1,5 @@
-# Nova local stack. `core` = what runs today (M1: + temporal, engine); minio (M2), openfga (M4) and
-# the ai profile join as their milestones land. `data` = M1 spike (Kafka + Debezium + ClickHouse). Host ports avoid the usual 3000/5432/8080 clashes.
+# Nova local stack. `core` = what runs today (M2: + minio, litellm, agents); openfga (M4) and the ai
+# profile (langfuse, weaviate) join as their milestones land. `data` = M1 spike (Kafka + Debezium + ClickHouse). Host ports avoid the usual 3000/5432/8080 clashes.
 name: nova
 
 x-api-env: &api-env
@@ -9,6 +9,10 @@ x-api-env: &api-env
   KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/nova/protocol/openid-connect/certs
   TEMPORAL_HOST: temporal:7233
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  OTEL_METRICS_EXPORTER: none  # Jaeger takes traces only; metrics join with the M4 collector
+  OTEL_LOGS_EXPORTER: none
+  S3_ENDPOINT: minio:9000
+  LLM_BASE_URL: http://litellm:4000
   ENV: dev
 
 services:
@@ -83,6 +87,38 @@ services:
     profiles: [core]
     ports: ["127.0.0.1:16686:16686"]
 
+  minio:
+    # chainguard build: MinIO stopped publishing community images in 2025. Bucket is created lazily
+    # by nova_core.storage, so no init container.
+    image: cgr.dev/chainguard/minio:latest
+    profiles: [core]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: nova
+      MINIO_ROOT_PASSWORD: nova-dev-secret
+    ports: ["127.0.0.1:9100:9000", "127.0.0.1:9101:9001"]
+    volumes: [miniodata:/data]
+
+  litellm:
+    # one gateway for every model call; LLM_MODE (from ../.env) picks config.<mode>.yaml (ADR-014)
+    image: ghcr.io/berriai/litellm:main-stable
+    profiles: [core]
+    # ../.env carries the app's DATABASE_URL; LiteLLM gets its own DB (spend, budgets, admin UI)
+    entrypoint: ["sh", "-c", "export DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm; exec litellm --config /configs/config.$${LLM_MODE:-cheap}.yaml --port 4000"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      LITELLM_MASTER_KEY: sk-nova-dev
+      UI_USERNAME: admin          # dev-only admin UI login at http://localhost:4100/ui
+      UI_PASSWORD: nova-dev-admin
+    volumes: ["./litellm:/configs:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]  # host Ollama (decide fallback, embeddings)
+    ports: ["127.0.0.1:4100:4000"]
+    depends_on:
+      redis: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
   migrate:
     image: nova-api:dev
     build: { context: .., dockerfile: services/api/Dockerfile }
@@ -101,6 +137,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       temporal: { condition: service_healthy }
+      minio: { condition: service_started }
 
   engine:
     image: nova-engine:dev
@@ -111,6 +148,22 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       temporal: { condition: service_healthy }
+
+  agents:
+    image: nova-agents:dev
+    build: { context: .., dockerfile: services/agents/Dockerfile }
+    profiles: [core]
+    environment:
+      <<: *api-env
+      LLM_API_KEY: sk-nova-dev
+      LLM_MODE: ${LLM_MODE:-cheap}
+      JEV_MODEL: typesafe/jev-1.13  # decisions model behind the gateway's /jev/decisions
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+      litellm: { condition: service_started }
+      minio: { condition: service_started }
 
   web:
     image: nova-web:dev
@@ -182,6 +235,7 @@ services:
       retries: 20
 
 volumes:
+  miniodata:
   pgdata:
   temporaldata:
   chdata:

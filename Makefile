@@ -2,7 +2,7 @@
 # lines below directly.
 COMPOSE = docker compose -f infra/docker-compose.yml --profile core
 
-.PHONY: up down logs seed test test-int lint fmt gen ci
+.PHONY: up down logs seed test test-int lint fmt gen ci bols bench-llm redteam
 
 up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
@@ -37,6 +37,15 @@ gen:           ## regenerate DSL JSON Schema, OpenAPI and the web TS types
 	uv run python -m nova_dsl.schema
 	uv run python -m nova_api.openapi
 	pnpm -C apps/web gen
+
+bols:          ## render the 10 W1 seed BoLs (definitions/seed/bol_cases.json) to data/seed/bol
+	uv run python scripts/gen_bols.py
+
+bench-llm:     ## live LLM eval + timings against the running gateway (~$0.01 in cheap) -> docs/evals
+	LLM_BASE_URL=http://localhost:4100 JEV_MODEL=typesafe/jev-1.13 uv run python scripts/eval_llm.py
+
+redteam:       ## 10 prompt-injection BoLs through the live stack; fails on any unauthorised state change
+	uv run python scripts/redteam_bols.py
 
 fmt:
 	uv run ruff check --fix .
