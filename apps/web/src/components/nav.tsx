@@ -14,14 +14,15 @@ const NAV = [
   { label: "Runs", href: "/runs", icon: Activity, m: null },
   { label: "Studio", href: "/studio", icon: Workflow, m: null },
   { label: "Exceptions", href: "/exceptions", icon: ShieldAlert, m: "M6" },
-  { label: "Admin", href: "/admin", icon: Settings, m: "M4" },
+  { label: "Admin", href: "/admin", icon: Settings, m: null, needs: ["can_edit_config", "can_manage_budgets", "can_read_audit"] },
 ];
 
-export function Nav({ openTasks }: { openTasks: number }) {
+export function Nav({ openTasks, caps }: { openTasks: number; caps: string[] }) {
   const path = usePathname();
   return (
     <nav className="mt-6 flex flex-col gap-0.5" aria-label="Main">
-      {NAV.map(({ label, href, icon: Icon, m, badge }) => {
+      {NAV.map(({ label, href, icon: Icon, m, badge, needs }) => {
+        if (needs && !needs.some((c) => caps.includes(c))) return null; // UI only; the API enforces
         if (m)
           return (
             <span key={href} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted" title={`Arrives in ${m}`}>

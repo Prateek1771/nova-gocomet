@@ -1,0 +1,15 @@
+# Core: every service exports OTLP here; traces go to Jaeger (dev trace UI, ADR-021). With the ai profile
+# up, `make up-full` switches to collector.ai.yaml, which also feeds Langfuse (ADR-029).
+receivers:
+  otlp:
+    protocols:
+      http: { endpoint: 0.0.0.0:4318 }
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch: {}
+exporters:
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
+service:
+  pipelines:
+    traces: { receivers: [otlp], processors: [batch], exporters: [otlphttp/jaeger] }

@@ -1,5 +1,5 @@
-# Nova local stack. `core` = what runs today (M2: + minio, litellm, agents); openfga (M4) and the ai
-# profile (langfuse, weaviate) join as their milestones land. `data` = M1 spike (Kafka + Debezium + ClickHouse). Host ports avoid the usual 3000/5432/8080 clashes.
+# Nova local stack. `core` = what runs today (M4: + openfga); the ai profile (langfuse, weaviate) joins
+# as its milestone lands. `data` = M1 spike (Kafka + Debezium + ClickHouse). Host ports avoid the usual 3000/5432/8080 clashes.
 name: nova
 
 x-api-env: &api-env
@@ -8,11 +8,13 @@ x-api-env: &api-env
   KEYCLOAK_ISSUER: http://localhost:8180/realms/nova
   KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/nova/protocol/openid-connect/certs
   TEMPORAL_HOST: temporal:7233
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
-  OTEL_METRICS_EXPORTER: none  # Jaeger takes traces only; metrics join with the M4 collector
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318  # fans out to Jaeger (+ Langfuse with ai)
+  OTEL_METRICS_EXPORTER: none  # traces only for now
   OTEL_LOGS_EXPORTER: none
   S3_ENDPOINT: minio:9000
   LLM_BASE_URL: http://litellm:4000
+  OPENFGA_URL: http://openfga:8080
+  LLM_KEY_SECRET: nova-dev-llm-key-secret  # derives each tenant's LiteLLM virtual key (ADR-028)
   ENV: dev
 
 services:
@@ -81,11 +83,18 @@ services:
       retries: 30
 
   jaeger:
-    # ponytail: Jaeger all-in-one (in-memory) as the dev trace UI on :16686. The OTel collector and
-    # Langfuse arrive with the ai profile in M4; services keep speaking plain OTLP either way.
+    # ponytail: Jaeger all-in-one (in-memory) as the dev trace UI on :16686, fed by the collector.
     image: jaegertracing/jaeger:2.11.0
     profiles: [core]
     ports: ["127.0.0.1:16686:16686"]
+
+  otel-collector:
+    # every service speaks OTLP to this; the config picks the sinks (ADR-021, ADR-029)
+    image: otel/opentelemetry-collector-contrib:0.135.0
+    profiles: [core]
+    command: ["--config=/etc/otel/${OTEL_COLLECTOR_CONFIG:-collector.yaml}"]
+    volumes: ["./otel:/etc/otel:ro"]
+    depends_on: [jaeger]
 
   minio:
     # chainguard build: MinIO stopped publishing community images in 2025. Bucket is created lazily
@@ -119,6 +128,20 @@ services:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
 
+  openfga:
+    # authz engine (ADR-009). Holds only the model: facts arrive as contextual tuples (ADR-026), so the
+    # in-memory store is enough; the API re-creates it on first use.
+    image: openfga/openfga:v1.10.2
+    profiles: [core]
+    command: ["run"]
+    environment:
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+    ports: ["127.0.0.1:8081:8080"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:8081"]
+      interval: 5s
+      retries: 20
+
   migrate:
     image: nova-api:dev
     build: { context: .., dockerfile: services/api/Dockerfile }
@@ -138,6 +161,7 @@ services:
       migrate: { condition: service_completed_successfully }
       temporal: { condition: service_healthy }
       minio: { condition: service_started }
+      openfga: { condition: service_healthy }
 
   engine:
     image: nova-engine:dev
@@ -177,6 +201,7 @@ services:
       OIDC_CLIENT_SECRET: nova-web-dev-secret
       NOVA_API_URL: http://api:8000
       REDIS_URL: redis://redis:6379
+      LANGFUSE_URL: ${LANGFUSE_URL:-}  # set by make up-full (ai profile) to show "LLM calls" links
     ports: ["127.0.0.1:3300:3000"]
     depends_on:
       redis: { condition: service_healthy }
@@ -222,7 +247,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
-    profiles: [data]
+    profiles: [data, ai]  # analytics (M6) and Langfuse share it (ADR-010)
     environment:
       CLICKHOUSE_USER: nova
       CLICKHOUSE_PASSWORD: nova
@@ -233,6 +258,81 @@ services:
       test: ["CMD", "clickhouse-client", "--user", "nova", "--password", "nova", "-q", "select 1"]
       interval: 10s
       retries: 20
+
+  # --- ai profile (M4): Langfuse v3 for LLM traces, on the shared Postgres, ClickHouse, Redis and MinIO.
+  # Run with: make up-full  (= --profile core --profile ai, collector.ai.yaml). UI: http://localhost:3400
+  langfuse-init:
+    # idempotent: the langfuse role + database and the MinIO bucket (existing volumes skip init SQL)
+    image: nova-api:dev
+    profiles: [ai]
+    command:
+      - python
+      - -c
+      - |
+        import asyncio, asyncpg, minio
+        async def db():
+            c = await asyncpg.connect("postgresql://postgres:postgres@postgres:5432/postgres")
+            if not await c.fetchval("select 1 from pg_roles where rolname = 'langfuse'"):
+                await c.execute("create role langfuse login password 'langfuse'")
+            if not await c.fetchval("select 1 from pg_database where datname = 'langfuse'"):
+                await c.execute("create database langfuse owner langfuse")
+            await c.close()
+        asyncio.run(db())
+        m = minio.Minio("minio:9000", "nova", "nova-dev-secret", secure=False)
+        m.bucket_exists("langfuse") or m.make_bucket("langfuse")
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+    restart: "no"
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.112.0
+    profiles: [ai]
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://langfuse:langfuse@postgres:5432/langfuse
+      SALT: nova-dev-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"  # dev only
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_USER: nova
+      CLICKHOUSE_PASSWORD: nova
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_CONNECTION_STRING: redis://redis:6379  # no AUTH (Langfuse otherwise sends a default password)
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: nova
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: nova-dev-secret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+    depends_on:
+      langfuse-init: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  langfuse-web:
+    image: langfuse/langfuse:3.112.0
+    profiles: [ai]
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: http://localhost:3400
+      NEXTAUTH_SECRET: nova-dev-nextauth-secret
+      # headless init: org, project, API keys (the collector's Basic auth) and a dev login
+      LANGFUSE_INIT_ORG_ID: nova
+      LANGFUSE_INIT_ORG_NAME: Nova
+      LANGFUSE_INIT_PROJECT_ID: nova-dev
+      LANGFUSE_INIT_PROJECT_NAME: nova-dev
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-nova-dev
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-nova-dev
+      LANGFUSE_INIT_USER_EMAIL: dev@nova.test
+      LANGFUSE_INIT_USER_NAME: Nova Dev
+      LANGFUSE_INIT_USER_PASSWORD: nova-dev-password
+    ports: ["127.0.0.1:3400:3000"]
+    depends_on:
+      langfuse-init: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
 volumes:
   miniodata:

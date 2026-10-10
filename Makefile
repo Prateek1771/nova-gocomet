@@ -2,13 +2,16 @@
 # lines below directly.
 COMPOSE = docker compose -f infra/docker-compose.yml --profile core
 
-.PHONY: up down logs seed test test-int lint fmt gen ci bols bench-llm redteam
+.PHONY: up up-full down logs seed test test-int lint fmt gen ci bols bench-llm redteam audit-verify
 
 up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
 
+up-full:       ## core + ai profile (Langfuse on :3400, collector also exports to it)
+	OTEL_COLLECTOR_CONFIG=collector.ai.yaml LANGFUSE_URL=http://localhost:3400 $(COMPOSE) --profile ai up -d --build
+
 down:
-	$(COMPOSE) down
+	$(COMPOSE) --profile ai --profile data down
 
 logs:
 	$(COMPOSE) logs -f --tail=100
@@ -36,6 +39,7 @@ lint:
 gen:           ## regenerate DSL JSON Schema, OpenAPI and the web TS types
 	uv run python -m nova_dsl.schema
 	uv run python -m nova_api.openapi
+	docker run --rm -v "$(CURDIR)/infra/openfga:/m:ro" openfga/cli:v0.7.3 model transform --file /m/model.fga > infra/openfga/model.json
 	pnpm -C apps/web gen
 
 bols:          ## render the 10 W1 seed BoLs (definitions/seed/bol_cases.json) to data/seed/bol
@@ -46,6 +50,9 @@ bench-llm:     ## live LLM eval + timings against the running gateway (~$0.01 in
 
 redteam:       ## 10 prompt-injection BoLs through the live stack; fails on any unauthorised state change
 	uv run python scripts/redteam_bols.py
+
+audit-verify:  ## recompute every tenant's audit hash chain; non-zero exit on a break
+	uv run python scripts/verify_audit.py
 
 fmt:
 	uv run ruff check --fix .

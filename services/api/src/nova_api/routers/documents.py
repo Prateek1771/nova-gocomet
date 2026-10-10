@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from nova_api import definitions
 from nova_api.authz import TenantDep, authorize
+from nova_api.routers import audit
 from nova_api.routers.runs import launch
 from nova_core import db, storage
 from nova_core.settings import get_settings
@@ -114,6 +115,9 @@ async def upload(
                 "u": c.sub,
                 "f": (file.filename or "")[:255] or None,
             },
+        )
+        await audit.record(
+            sess, c, "document.uploaded", f"document:{doc_id}", {"sha256": sha, "doc_type": doc_type}
         )
     if dt.default_workflow:
         await launch(

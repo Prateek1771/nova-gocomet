@@ -43,3 +43,20 @@ export type ValidationIssue = { code: string; message: string; node_id: string |
 export type Validation = { valid: boolean; issues: ValidationIssue[] };
 export type VersionBrief = S["VersionBrief"];
 export type WorkflowSummary = S["WorkflowSummary"];
+
+/** M4 governance. */
+export type Budget = { provisioned: boolean; max_budget: number | null; spend: number; period: string; resets_at: string | null };
+export type AuditEntry = {
+  seq: number;
+  at: string;
+  actor_type: string;
+  actor_id: string;
+  action: string;
+  subject: string;
+  evidence: unknown;
+  definition_version: number | null;
+  config_version: number | null;
+  hash: string;
+};
+export type AuditVerification = { valid: boolean; entries: number; broken: { seq: number; id: number; reason: string }[] };
+export type TenantConfigOut = { version: number; config: Record<string, unknown>; published_by: string; published_at: string };

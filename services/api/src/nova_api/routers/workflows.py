@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from nova_api import definitions
 from nova_api.authz import TenantDep, authorize
 from nova_api.errors import ApiError
+from nova_api.routers import audit
 from nova_core import db
 from nova_dsl import Issue, parse_workflow
 from nova_dsl.models import ActionNode, AgentNode, HumanTaskNode, SubflowNode
@@ -163,6 +164,7 @@ async def put_draft(c: TenantDep, key: str, body: DraftIn) -> DraftOut:
 @router.post("/{key}/validate")
 async def validate(c: TenantDep, key: str, body: DraftIn | None = None) -> Validation:
     """Validates the posted YAML, or the saved draft when there's no body."""
+    await authorize(c, "can_view", f"workflow:{c.tenant_id}/{key}")
     yaml = body.yaml if body else (await get_draft(c, key)).yaml
     _, issues = await _check(c, key, yaml)
     return Validation(**_validation(issues))
@@ -201,6 +203,7 @@ async def publish(c: TenantDep, key: str) -> Published:
             )
         except IntegrityError as e:  # two publishes raced for the same version number
             raise HTTPException(409, "another publish just happened; retry") from e
+        await audit.record(s, c, "workflow.published", f"workflow:{key}", definition_version=version)
     return Published(key=key, version=version)
 
 

@@ -178,3 +178,55 @@ Format: Context → Decision → Alternatives → Consequences. Status for all: 
 - `:free` ids churn. Re-list them with `curl https://openrouter.ai/api/v1/models` (keep `pricing.prompt == "0"`) and with Groq's `/openai/v1/models`, then re-pin.
 - The ai-eval gates are unchanged. A free model that misses a gate is a finding, not a reason to loosen the gate.
 **Measured (2026-10-09, `docs/evals/free-baseline.json`).** All gates pass: extraction micro-F1 0.986, validator recall 1.0 (5/5), decide accuracy 0.975 (40 cases). Text extraction takes about 2–10 s per BoL on Groq. The one scanned BoL took about 9 min, because both free Gemma vision models were rate-limited upstream and `openrouter/free` sometimes cut off its answer. Free vision is the weak spot; pay for vision first when budget appears. The cost figures in that report are LiteLLM pricing Groq at its paid list price. They predate zeroing Groq's price in the config, and the free plan doesn't bill.
+
+## ADR-026: OpenFGA holds only the model; every fact is a contextual tuple
+
+**Context.** ADR-019 sends roles as contextual tuples but persists Nova's own facts in OpenFGA: `workflow#tenant`, `run#workflow`, `task#run`, `task#assignee` and `task#approver with within_limit`. That is a second copy of rows Postgres already holds, written from the API *and* the engine. Every write is a dual write that can drift or half-fail, existing runs need a backfill, the engine gains an HTTP dependency, and tuples have to follow escalations and config edits.
+**Decision.** Supersedes ADR-019's "persisted tuples" clause; the rest of ADR-019 stands. OpenFGA stores **only the authorization model** (`infra/openfga/model.json`, generated from `model.fga` by `make gen`). For each check, `nova_api.authz` reads the object's row under RLS and sends its structure as contextual tuples alongside the roles:
+- `task → run → workflow → tenant`
+- the assignee role userset
+- for a task whose payload carries an `amount`: approver usersets with `within_limit{limit}`, with limits from the run's pinned `TenantConfig.approval_limits`
+
+The approver set is the assigned role plus every role with an equal or higher limit (the approval hierarchy). A task assigned to the unlimited top role, the controller, stays with that role: dual control. An approval task gets no plain assignee tuple, so no role can bypass its limit. The inbox lists open rows and batch-checks `can_claim`; `ListObjects` isn't used. Model deltas: `task.can_claim = can_complete`, and `tenant#tenant_admin` is assignable, because needs_attention tasks go to it.
+**Alternatives.** Persisted tuples (ADR-019 as written): the dual-write and backfill cost above. Authorization in SQL: violates rule 10 and duplicates the model.
+**Consequences.**
+- No sync, no backfill, and no engine change. The in-memory store is enough: the API re-creates it on first use or after an OpenFGA restart.
+- A check costs one tenant-scoped SQL read plus one OpenFGA call; the inbox makes one batch call per 50 tasks.
+- An object in another tenant doesn't resolve under RLS, so it is a 404 before OpenFGA is even asked.
+- OpenFGA being unreachable fails closed (503).
+- If tasks ever reach the thousands per user, revisit `ListObjects` with persisted tuples for that one query.
+
+## ADR-027: Audit log hash chain in a Postgres trigger
+
+**Context.** FR-X.1 asks for a tamper-evident audit log in which every entry carries the definition and config versions it acted under. Rows are written by the engine and by the API, and later by more writers.
+**Decision.** Migration 0004 adds `seq`, `definition_version`, `config_version`, `prev_hash` and `hash` to `audit_log`.
+- A `BEFORE INSERT` trigger takes a per-tenant advisory lock, assigns `seq = last + 1`, and sets `hash = sha256(prev_hash | row)` through one SQL function, `audit_digest`.
+- `audit_verify()` recomputes the chain and returns the first broken link.
+- Existing rows are backfilled in id order.
+- `GET /audit` and `GET /audit/verify` need `can_read_audit`, and `make audit-verify` is the scheduled job.
+- The engine stamps versions from the run; the API audits publish, config publish and upload in the same transaction as the change.
+**Alternatives.** Hashing in application code: every writer must remember to do it, and concurrent writers race on `prev_hash`. An external ledger or WORM store: more infrastructure than the prototype needs.
+**Consequences.** Every writer is chained without code. `seq` (not `id`) orders the chain, because identity ids are handed out before the lock. Writes to the audit log are serialised per tenant (fine at this volume). An owner can still edit or delete rows, but verification shows exactly where. Anchoring the head hash externally (e.g. nightly to object storage) is a stretch item.
+
+## ADR-028: Per-tenant LiteLLM virtual keys, derived rather than stored
+
+**Context.** Every tenant shared the gateway's master key, so there was no per-tenant spend or budget (FR-2.4). A budget refusal looked like any other error and was retried.
+**Decision.** Each tenant's key is `sk-nova-t-` + `HMAC-SHA256(LLM_KEY_SECRET, tenant_id)` (`nova_core.llm_keys`). Nothing is stored; LiteLLM keeps only its hash.
+- The API provisions the key (`/key/generate`, or `/key/update` when it exists) with `max_budget = TenantConfig.llm_budget_usd` and a 30-day period. It does this at startup (retrying while the gateway boots) and on every config publish.
+- Agents derive the same key per call from the request's `tenant_id`.
+- LiteLLM's `budget_exceeded` refusal becomes `BudgetExceeded`, re-raised as a non-retryable `ApplicationError(type="BudgetExceeded")`. The decide fallbacks don't swallow it, because every alias bills the same key.
+- The engine's needs_attention task carries `error_type` and `message`, and the step-failure screen says "budget exhausted, raise it in Admin, then Retry".
+- `/admin/llm-budget` (`can_manage_budgets`) reads spend from `/key/info`.
+**Alternatives.** Store generated keys in a table (encrypted): more code and a secret at rest for no gain. Enforce budgets in Nova: duplicates what the gateway already meters.
+**Consequences.** Rotating `LLM_KEY_SECRET` re-keys every tenant at once (re-run provisioning). **LiteLLM skips budget checks for zero-cost models**, so in `LLM_MODE=free` budgets never trip; the stop is real in `cheap`/`demo`. The mapping is tested with LiteLLM's error shape and the engine path with a time-skipping test. Spend from failed attempts is metered by the gateway but not booked on the run (follow-up).
+
+## ADR-029: OTel Collector in core; Langfuse v3 in the `ai` profile via OTLP
+
+**Context.** ADR-021 promised that the collector → Langfuse swap would be an endpoint change. M4 needs LLM traces with model, tokens and cost per run (FR-2.4, 08 §5).
+**Decision.**
+- **Collector:** `otel-collector` (contrib 0.135) joins `core`, and every service exports to it. `collector.yaml` forwards to Jaeger; `collector.ai.yaml` also forwards to Langfuse's OTLP endpoint.
+- **`ai` profile:** Langfuse v3 (`langfuse-web` on :3400 + `langfuse-worker`) on the shared Postgres (db `langfuse`), ClickHouse (now in the `data` and `ai` profiles), Redis and MinIO (bucket `langfuse`). Headless init creates the org, project and API keys, and `langfuse-init` creates the database and bucket idempotently. `make up-full` runs it.
+- **LLM spans:** they carry OTel GenAI attributes (`gen_ai.request.model`, `gen_ai.usage.*`, `gen_ai.usage.cost`, `langfuse.observation.type=generation`) plus `nova.tenant_id`/`nova.run_id`. They carry ids, model, tokens and cost, never prompts or document content.
+- **Trace links:** `run_steps.trace_id` is written from the activity's span. The run page links the run's trace in Jaeger and, when `LANGFUSE_URL` is set, its LLM calls in Langfuse.
+**Alternatives.** The LiteLLM Langfuse callback: it sees only the gateway's call, not the run, and needs Langfuse keys in the gateway. A separate ClickHouse for Langfuse: about 1 GB more RAM.
+**Consequences.** The `ai` profile adds about 2.5 GB including ClickHouse. One trace per run spans API, workflow, activities, SQL and LLM calls; Jaeger shows all of it, and Langfuse the generations. Langfuse being down only backs up the collector's retry queue, and core keeps working.

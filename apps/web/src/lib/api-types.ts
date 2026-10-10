@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/admin/llm-budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Llm Budget */
+        get: operations["llm_budget_api_v1_admin_llm_budget_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{key}": {
         parameters: {
             query?: never;
@@ -13,6 +30,40 @@ export interface paths {
         };
         /** Get App */
         get: operations["get_app_api_v1_apps__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audit */
+        get: operations["list_audit_api_v1_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verify */
+        get: operations["verify_api_v1_audit_verify_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -225,9 +276,8 @@ export interface paths {
         };
         /**
          * Inbox
-         * @description Open work by default. `mine=true`: tasks I've claimed.
-         *     ponytail: role-based inbox (OpenFGA ListObjects can_view) arrives in M4; until then every open task
-         *     in the tenant is listed.
+         * @description Open work the caller can act on (OpenFGA `can_claim`: their role is the assignee, or an approver
+         *     within its limit). `mine=true`: tasks I've claimed. `status=done` lists finished work they could see.
          */
         get: operations["inbox_api_v1_tasks_get"];
         put?: never;
@@ -421,6 +471,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AuditEntry */
+        AuditEntry: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id: string;
+            /** Actor Type */
+            actor_type: string;
+            /** At */
+            at: string;
+            /** Config Version */
+            config_version: number | null;
+            /** Definition Version */
+            definition_version: number | null;
+            /** Evidence */
+            evidence: unknown;
+            /** Hash */
+            hash: string;
+            /** Seq */
+            seq: number;
+            /** Subject */
+            subject: string;
+        };
         /** Body_upload_api_v1_documents_post */
         Body_upload_api_v1_documents_post: {
             /**
@@ -430,6 +503,19 @@ export interface components {
             doc_type: string;
             /** File */
             file: string;
+        };
+        /** Budget */
+        Budget: {
+            /** Max Budget */
+            max_budget: number | null;
+            /** Period */
+            period: string;
+            /** Provisioned */
+            provisioned: boolean;
+            /** Resets At */
+            resets_at: string | null;
+            /** Spend */
+            spend: number;
         };
         /** CompleteIn */
         CompleteIn: {
@@ -629,6 +715,8 @@ export interface components {
             started_at: string;
             /** Status */
             status: string;
+            /** Trace Id */
+            trace_id?: string | null;
         };
         /** TaskBrief */
         TaskBrief: {
@@ -730,6 +818,17 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verification */
+        Verification: {
+            /** Broken */
+            broken: {
+                [key: string]: unknown;
+            }[];
+            /** Entries */
+            entries: number;
+            /** Valid */
+            valid: boolean;
+        };
         /** Version */
         Version: {
             /** Key */
@@ -774,6 +873,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    llm_budget_api_v1_admin_llm_budget_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Budget"];
+                };
+            };
+        };
+    };
     get_app_api_v1_apps__key__get: {
         parameters: {
             query?: never;
@@ -803,6 +922,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_api_v1_audit_get: {
+        parameters: {
+            query?: {
+                /** @description seq to page back from */
+                before?: number | null;
+                limit?: number;
+                /** @description prefix, e.g. task:<id> or run:<id> */
+                subject?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_api_v1_audit_verify_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Verification"];
                 };
             };
         };

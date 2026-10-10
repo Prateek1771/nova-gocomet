@@ -1,0 +1,94 @@
+# W1 · Bill of Lading intake, Bolt's variant (FR-X.2). Same engine, different process: Bolt sends every
+# BoL with any validator finding to a human (Acme lets low-severity residue through to the model), and
+# its reviews escalate after 2h. Thresholds still come from Bolt's TenantConfig.
+# decide can't branch by itself, so a rule sits after it; thresholds come from TenantConfig.
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: bol_intake
+  title: Bill of Lading intake
+trigger:
+  type: document_upload
+  doc_type: bill_of_lading
+inputs:
+  document_id: {type: string}
+nodes:
+  - id: extract
+    type: agent
+    agent: doc_extractor
+    with: {document_id: "${{ input.document_id }}", schema: bol_v1}
+    retry: {max_attempts: 3}
+    timeout: 180s
+  - id: validate
+    type: agent
+    agent: bol_validator
+    with:
+      document_id: "${{ input.document_id }}"
+      extraction: "${{ nodes.extract.output }}"
+      severity: "${{ tenant.check_severity ?? {} }}"
+    timeout: 120s
+  - id: material
+    type: decide
+    questions:
+      - id: material_issue
+        ask: "Would any of these issues block customs filing or cargo release?"
+        context: "${{ nodes.validate.output.issues }}"
+        criteria:
+          "true": >-
+            At least one issue makes the declared data wrong, inconsistent or unverifiable for customs:
+            an invalid container number, an unknown port code, a mismatch with the booking (consignee,
+            port, container count), a weight total that doesn't add up, or an unreadable document.
+          "false": "There are no issues, or only cosmetic ones that don't change any declared value."
+        # a missed blocker costs a customs hold; a needless review costs minutes, so lean to review
+        threshold: 0.4
+    timeout: 60s
+  - id: route
+    type: rule
+    cases:
+      # deterministic first (rule 3): a high or medium check failure always gets a human. The model
+      # only judges the residue (low-severity issues), so a fooled or injected model can't wave a
+      # real discrepancy through.
+      - when: "nodes.validate.output.max_severity in ['high', 'medium']"
+        goto: review
+      # Bolt: any finding at all, even low severity, gets a human (no model judgement on the residue)
+      - when: "size(nodes.validate.output.issues) > 0"
+        goto: review
+      # threshold from TenantConfig when set (rule 2); 0.85 is the documented W1 default
+      - when: >-
+          nodes.material.output.material_issue ||
+          double(nodes.extract.output.min_confidence) <
+          (has(tenant.bol_min_confidence) ? double(tenant.bol_min_confidence) : 0.85)
+        goto: review
+    default: push
+  - id: review
+    type: human_task
+    title: "Review BoL ${{ nodes.extract.output.fields.bol_number ?? 'unknown' }}"
+    assignee: {role: ops_exec}
+    app: bol_review
+    sla: 2h
+    escalate: {after: 2h, to: {role: ops_lead}}
+    outputs: [approved, rejected]
+    with:
+      document_id: "${{ input.document_id }}"
+      fields: "${{ nodes.extract.output.fields }}"
+      confidence: "${{ nodes.extract.output.confidence }}"
+      evidence: "${{ nodes.extract.output.evidence }}"
+      issues: "${{ nodes.validate.output.issues }}"
+      why: "${{ nodes.material.output.why }}"
+  - id: push
+    type: action
+    action: tms.upsert_shipment
+    with:
+      fields: "${{ nodes.review.output.payload.fields ?? nodes.extract.output.fields }}"
+  - id: done
+    type: end
+  - id: rejected
+    type: end
+    status: rejected
+edges:
+  - {from: extract, to: validate}
+  - {from: validate, to: material}
+  - {from: material, to: route}
+  - {from: review, to: push, on: approved}
+  - {from: review, to: rejected, on: rejected}
+  - {from: push, to: done}

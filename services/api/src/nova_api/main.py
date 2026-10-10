@@ -1,6 +1,8 @@
+import asyncio
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
@@ -9,8 +11,9 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
 from nova_api import errors
+from nova_api.authz import TenantCaller, allowed
 from nova_api.deps import CallerDep
-from nova_api.routers import apps, catalog, config, documents, runs, tasks, workflows
+from nova_api.routers import admin, apps, audit, catalog, config, documents, runs, tasks, workflows
 from nova_core import db
 from nova_core.logging import configure_logging
 from nova_core.settings import get_settings
@@ -20,7 +23,22 @@ settings = get_settings()
 configure_logging(settings.log_level)
 tracing = configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
 
-app = FastAPI(title="Nova API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    task = asyncio.create_task(admin.provision_all()) if settings.llm_key_secret else None
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(
+    title="Nova API",
+    version="0.1.0",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan,
+)
 if tracing:
     FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz")
 errors.install(app)
@@ -62,6 +80,16 @@ async def readyz() -> dict[str, str]:
 
 
 v1 = APIRouter(prefix="/api/v1")
+CAPABILITIES = (
+    "can_view",
+    "can_operate",
+    "can_design",
+    "can_edit_config",
+    "can_manage_budgets",
+    "can_manage_users",
+    "can_view_analytics",
+    "can_read_audit",
+)
 
 
 @v1.get("/me")
@@ -81,11 +109,22 @@ async def me(c: CallerDep) -> dict[str, Any]:
                 await s.execute(text("select name from tenants where id = :t"), {"t": c.tenant_id})
             ).scalar()
         tenant = {"id": str(c.tenant_id), "slug": c.tenant_slug, "name": name}
-    # ponytail: capabilities (OpenFGA batch check) join this payload in M4
-    return {"sub": p.sub, "email": p.email, "name": p.name, "tenant": tenant, "roles": sorted(p.roles)}
+    caps: list[str] = []
+    if c.tenant_id:  # the shell hides what the caller can't do; the API still enforces every route
+        tc, obj = TenantCaller(c, c.tenant_id), f"tenant:{c.tenant_id}"
+        ok = await allowed(tc, [(cap, obj, [], None) for cap in CAPABILITIES])
+        caps = [cap for cap, y in zip(CAPABILITIES, ok, strict=True) if y]
+    return {
+        "sub": p.sub,
+        "email": p.email,
+        "name": p.name,
+        "tenant": tenant,
+        "roles": sorted(p.roles),
+        "capabilities": caps,
+    }
 
 
-routers = (workflows, runs, tasks, config, documents, apps, catalog)
+routers = (workflows, runs, tasks, config, documents, apps, catalog, audit, admin)
 for r in (m.router for m in routers):
     v1.include_router(r)
 app.include_router(v1)

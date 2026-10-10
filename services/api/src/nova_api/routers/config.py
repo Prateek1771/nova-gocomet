@@ -3,16 +3,20 @@
 import json
 from typing import Any
 
+import httpx
+import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from nova_api.authz import TenantDep, authorize
+from nova_api.routers import admin, audit
 from nova_core import db
 from nova_dsl import TenantConfig
 
 router = APIRouter(prefix="/tenant-config", tags=["config"])
+log = structlog.get_logger()
 
 
 class ConfigOut(BaseModel):
@@ -51,12 +55,21 @@ async def put_config(c: TenantDep, body: TenantConfig) -> ConfigOut:
     await authorize(c, "can_edit_config", f"tenant:{c.tenant_id}")
     try:
         async with db.tenant_session(c.tenant_id) as s:
-            await s.execute(
-                text("""insert into tenant_configs (tenant_id, version, config, published_by)
-                        select :t, coalesce(max(version), 0) + 1, cast(:c as jsonb), :by
-                        from tenant_configs"""),
-                {"t": c.tenant_id, "c": json.dumps(body.model_dump(mode="json")), "by": c.sub},
-            )
+            version = (
+                await s.execute(
+                    text("""insert into tenant_configs (tenant_id, version, config, published_by)
+                            select :t, coalesce(max(version), 0) + 1, cast(:c as jsonb), :by
+                            from tenant_configs returning version"""),
+                    {"t": c.tenant_id, "c": json.dumps(body.model_dump(mode="json")), "by": c.sub},
+                )
+            ).scalar_one()
+            await audit.record(s, c, "config.published", f"tenant:{c.tenant_id}", config_version=version)
     except IntegrityError as e:
         raise HTTPException(409, "another config was just published; retry") from e
+    try:  # the budget applies to the next model call; the gateway being down doesn't block the publish
+        await admin.provision(
+            c.tenant_id, c.caller.tenant_slug or "", body.model_dump().get("llm_budget_usd")
+        )
+    except httpx.HTTPError as e:
+        log.warning("llm_key_provision_failed", error=str(e))
     return await _latest(c)

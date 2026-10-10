@@ -12,7 +12,9 @@ RUN useradd --system --uid 10001 nova
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/services/api/alembic.ini /app/alembic.ini
 COPY definitions /app/definitions
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 DEFINITIONS_DIR=/app/definitions
+COPY infra/openfga/model.json /app/openfga-model.json
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 DEFINITIONS_DIR=/app/definitions \
+    OPENFGA_MODEL_PATH=/app/openfga-model.json
 WORKDIR /app
 USER nova
 EXPOSE 8000

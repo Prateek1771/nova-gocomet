@@ -63,6 +63,7 @@ class Fake:
         self.fail_actions = 0  # next N run_action calls fail (non-retryable)
         self.slow_actions = False
         self.decide_answer = {"blocking": False}
+        self.budget_left = True  # False: run_agent fails like the agents worker on an exhausted budget
 
     def acts(self) -> list[Any]:
         @activity.defn(name="load_definition")
@@ -96,6 +97,8 @@ class Fake:
     def agent_acts(self) -> list[Any]:
         @activity.defn(name="run_agent")
         async def run_agent(r: AgentRequest) -> Any:
+            if not self.budget_left:
+                raise ApplicationError("LLM budget exhausted", type="BudgetExceeded", non_retryable=True)
             return {"agent": r.name, "fields": {"total": 1}}
 
         @activity.defn(name="decide")
@@ -315,6 +318,31 @@ async def test_failed_step_abort(run: Any) -> None:
     await decide_task(h, "abort", user="admin")
     assert (await h.result()).status == "failed"
     assert run.fake.run_statuses()[-1] == "failed"
+
+
+AGENT_ONLY = """
+metadata: {key: agent_only}
+nodes:
+  - {id: extract, type: agent, agent: doc_extractor, retry: {max_attempts: 5}}
+  - {id: done, type: end}
+edges:
+  - {from: extract, to: done}
+"""
+
+
+async def test_budget_exhausted_degrades_to_a_human_then_retries(run: Any) -> None:
+    """07 M4 exit: a spent tenant budget becomes a needs_attention task saying so, with no wasted
+    activity retries; after the budget is raised, Retry re-runs the step."""
+    run.fake.budget_left = False
+    h = await run("agent_only", {}, defs={"agent_only": inline(AGENT_ONLY)})
+    await open_task(h)  # the shared wait-for-a-task helper (no wall-clock loop of our own)
+    fix = next(t for t in run.fake.tasks if t.title)
+    assert fix.app_key == "step_failure" and fix.title.startswith("LLM budget exhausted")
+    assert fix.payload["error_type"] == "BudgetExceeded"
+    assert "needs_attention" in run.fake.run_statuses()
+    run.fake.budget_left = True  # an admin raised the budget
+    await decide_task(h, "retry", user="admin")
+    assert (await h.result()).status == "completed"
 
 
 BAD_RULE = """

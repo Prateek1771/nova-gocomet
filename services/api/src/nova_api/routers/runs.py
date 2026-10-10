@@ -55,6 +55,7 @@ class StepOut(BaseModel):
     output: Any
     started_at: str
     ended_at: str | None
+    trace_id: str | None = None  # OTel trace: Jaeger / Langfuse link
 
 
 class TaskBrief(BaseModel):
@@ -160,7 +161,7 @@ async def get_run(c: TenantDep, run_id: uuid.UUID) -> RunDetail:
         if r is None:
             raise HTTPException(404, "run not found")
         steps = await s.execute(
-            text("""select node_id, node_type, status, output, started_at, ended_at from run_steps
+            text("""select node_id, node_type, status, output, started_at, ended_at, trace_id from run_steps
                     where run_id = :r order by started_at, id"""),
             {"r": run_id},
         )
@@ -179,6 +180,7 @@ async def get_run(c: TenantDep, run_id: uuid.UUID) -> RunDetail:
                     output=x.output,
                     started_at=x.started_at.isoformat(),
                     ended_at=x.ended_at.isoformat() if x.ended_at else None,
+                    trace_id=x.trace_id,
                 )
                 for x in steps
             ],

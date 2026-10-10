@@ -70,6 +70,10 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
   const wf = run.temporal_workflow_id ?? `run-${run.id}`;
   const jaeger = `${env.jaegerUiUrl}/search?service=nova-engine&limit=20&lookback=2d&tags=${encodeURIComponent(JSON.stringify({ temporalWorkflowID: wf }))}`;
   const live = run.status === "running" || run.status === "pending";
+  // one trace per run (Temporal propagates it): the first step that recorded it opens it in Jaeger / Langfuse
+  const traceId = run.steps.find((s) => s.trace_id)?.trace_id;
+  const trace = traceId ? `${env.jaegerUiUrl}/trace/${traceId}` : jaeger;
+  const langfuse = traceId && env.langfuseUrl ? `${env.langfuseUrl}/project/${env.langfuseProject}/traces/${traceId}` : null;
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -85,9 +89,14 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
           <a href={`${env.temporalUiUrl}/namespaces/default/workflows/${wf}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs font-medium hover:bg-canvas">
             Temporal <ExternalLink className="size-3" />
           </a>
-          <a href={jaeger} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs font-medium hover:bg-canvas">
+          <a href={trace} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs font-medium hover:bg-canvas">
             Trace <ExternalLink className="size-3" />
           </a>
+          {langfuse && (
+            <a href={langfuse} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs font-medium hover:bg-canvas">
+              LLM calls <ExternalLink className="size-3" />
+            </a>
+          )}
         </span>
       </div>
 

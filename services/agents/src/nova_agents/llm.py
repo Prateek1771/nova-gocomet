@@ -11,6 +11,7 @@ import httpx
 from opentelemetry import trace
 from temporalio import activity
 
+from nova_core.llm_keys import tenant_key
 from nova_core.settings import get_settings
 
 tracer = trace.get_tracer("nova.llm")
@@ -19,6 +20,22 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 class LLMError(Exception):
     pass
+
+
+class BudgetExceeded(LLMError):
+    """The tenant's LiteLLM budget is spent. Not retryable: the engine opens a needs_attention task."""
+
+
+def _fail(what: str, r: httpx.Response) -> LLMError:
+    if r.status_code in (400, 429) and "budget" in r.text.lower() and "exceed" in r.text.lower():
+        return BudgetExceeded(f"{what}: LLM budget exhausted ({r.text[:200]})")
+    return LLMError(f"{what}: HTTP {r.status_code} {r.text[:300]}")
+
+
+def _auth(tenant_id: str | None) -> dict[str, str]:
+    """The tenant's virtual key when there is one, so spend and budget are per tenant (ADR-028)."""
+    key = tenant_key(tenant_id) if tenant_id else None
+    return {"Authorization": f"Bearer {key}"} if key else {}
 
 
 @dataclass
@@ -82,11 +99,13 @@ class LLM:
             body["cache"] = {"no-cache": True}
         with tracer.start_as_current_span(f"llm {alias}") as span:
             t0 = time.perf_counter()
-            r = await self._http.post("/chat/completions", json=body)
+            r = await self._http.post(
+                "/chat/completions", json=body, headers=_auth((metadata or {}).get("tenant_id"))
+            )
             ms = int((time.perf_counter() - t0) * 1000)
             if r.status_code >= 400:
                 span.set_attribute("error", True)
-                raise LLMError(f"{alias}: HTTP {r.status_code} {r.text[:300]}")
+                raise _fail(alias, r)
             data = r.json()
             usage = data.get("usage") or {}
             c = Completion(
@@ -103,20 +122,32 @@ class LLM:
                 "llm.cost_usd": c.cost_usd,
                 "llm.tokens_in": c.tokens_in,
                 "llm.tokens_out": c.tokens_out,
+                # OTel GenAI conventions: Langfuse (ai profile) renders these as a generation (ADR-029).
+                # Ids, model, tokens and cost only; prompts and document content stay out of traces.
+                "langfuse.observation.type": "generation",
+                "gen_ai.operation.name": "chat",
+                "gen_ai.request.model": alias,
+                "gen_ai.response.model": c.model,
+                "gen_ai.usage.input_tokens": c.tokens_in,
+                "gen_ai.usage.output_tokens": c.tokens_out,
+                "gen_ai.usage.cost": c.cost_usd,
             }
+            for k in ("tenant_id", "run_id"):
+                if (metadata or {}).get(k):
+                    attrs[f"nova.{k}"] = str((metadata or {})[k])
             for k, v in attrs.items():
                 span.set_attribute(k, v)
             return c
 
-    async def decisions(self, body: dict[str, Any]) -> dict[str, Any]:
+    async def decisions(self, body: dict[str, Any], tenant_id: str | None = None) -> dict[str, Any]:
         """Typed decisions (Jev) via the gateway's pass-through; returns the provider's JSON."""
         with tracer.start_as_current_span("llm jev decisions") as span:
             t0 = time.perf_counter()
-            r = await self._http.post("/jev/decisions", json=body, timeout=30)
+            r = await self._http.post("/jev/decisions", json=body, timeout=30, headers=_auth(tenant_id))
             span.set_attribute("llm.ms", int((time.perf_counter() - t0) * 1000))
             if r.status_code >= 400:
                 span.set_attribute("error", True)
-                raise LLMError(f"jev decisions: HTTP {r.status_code} {r.text[:300]}")
+                raise _fail("jev decisions", r)
             out: dict[str, Any] = r.json()
             span.set_attribute("llm.cost_usd", float((out.get("usage") or {}).get("cost") or 0))
             return out

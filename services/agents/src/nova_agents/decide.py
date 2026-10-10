@@ -13,7 +13,7 @@ import json
 from typing import Any
 
 from nova_agents import llm
-from nova_agents.llm import LLMError
+from nova_agents.llm import BudgetExceeded, LLMError
 from nova_core.settings import get_settings
 
 CHAT_ALIASES = ("nova-decide", "nova-decide-fallback")
@@ -56,7 +56,7 @@ def _shape_ok(out: Any, ids: list[str]) -> bool:
 
 
 async def _jev(
-    ask: list[dict[str, Any]], calls: list[dict[str, Any]]
+    ask: list[dict[str, Any]], calls: list[dict[str, Any]], tenant_id: str | None = None
 ) -> tuple[dict[str, float], float] | None:
     s = get_settings()
     if not s.jev_model or s.llm_mode in {"local", "free"}:  # Jev is paid
@@ -74,8 +74,10 @@ async def _jev(
         },
     }
     try:
-        out = await llm.client().decisions(body)
+        out = await llm.client().decisions(body, tenant_id)
         probs = {q["id"]: float(out["answers"][q["id"]]["noul"]) for q in ask}
+    except BudgetExceeded:
+        raise  # no fallback can help: every alias bills the same tenant key
     except (LLMError, KeyError, TypeError, ValueError) as e:
         calls.append({"alias": "jev", "error": str(e)[:200]})
         return None
@@ -108,6 +110,8 @@ async def _chat(
                 max_tokens=400,
                 metadata=meta,
             )
+        except BudgetExceeded:
+            raise
         except LLMError as e:
             calls.append({"alias": alias, "error": str(e)[:200]})
             continue
@@ -135,7 +139,7 @@ async def decide(questions: list[dict[str, Any]], meta: dict[str, str]) -> dict[
     calls: list[dict[str, Any]] = []
     cost = 0.0
     if ask:
-        jev = await _jev(ask, calls)
+        jev = await _jev(ask, calls, meta.get("tenant_id"))
         if jev is not None:
             probability, cost = jev
             for q in ask:

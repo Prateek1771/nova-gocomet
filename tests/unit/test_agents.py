@@ -147,6 +147,28 @@ async def test_decide_gives_up_to_a_human() -> None:
         await decide(Q, {})
 
 
+async def test_budget_exhausted_is_not_retried_or_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-028: calls go out with the tenant's derived key; LiteLLM's budget error becomes
+    BudgetExceeded and skips the decide fallbacks (they bill the same key)."""
+    from nova_core.settings import get_settings
+
+    monkeypatch.setattr(get_settings(), "llm_key_secret", "s3cret")
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.headers["authorization"])
+        msg = "ExceededBudget: Budget has been exceeded! Current cost: 2.01, Max budget: 2.0"
+        return httpx.Response(400, json={"error": {"message": msg, "type": "budget_exceeded"}})
+
+    llm.use(llm.LLM(transport=httpx.MockTransport(handler)))
+    with pytest.raises(llm.BudgetExceeded):
+        await decide(Q, {"tenant_id": "t-1"})
+    assert len(seen) == 1 and seen[0].startswith("Bearer sk-nova-t-")
+    from nova_core.llm_keys import tenant_key
+
+    assert seen[0] == f"Bearer {tenant_key('t-1')}" != f"Bearer {tenant_key('t-2')}"
+
+
 def test_parse_json_tolerates_fences() -> None:
     assert llm.parse_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert llm.parse_json('Sure! {"a": 2} hope that helps') == {"a": 2}
@@ -156,8 +178,14 @@ def test_parse_json_tolerates_fences() -> None:
 
 
 @pytest.fixture
-def api() -> Any:
+def api(monkeypatch: pytest.MonkeyPatch) -> Any:
+    from nova_api import fga
     from nova_api.authz import TenantCaller, tenant_caller
+
+    async def allow(_: Any) -> bool:  # authz itself is tested against real OpenFGA (integration)
+        return True
+
+    monkeypatch.setattr(fga, "check", allow)
     from nova_api.deps import Caller
     from nova_api.main import app
     from nova_core.auth import Principal

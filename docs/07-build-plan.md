@@ -190,24 +190,47 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
 **Goal:** tenancy, authority, budgets and tracing, all provable.
 
 ### Tasks
-- [ ] OpenFGA model with the RBAC capability matrix ([LLD §7](03-lld.md#7-authorization-openfga)); `require(capability, object)` on every route with contextual role tuples (FR-X.5).
-- [ ] Engine writes assignee/approver tuples; approver limits from `TenantConfig.approval_limits`.
-- [ ] Keycloak MFA policy for privileged roles (staging realm); login/admin events on.
-- [ ] Inbox via `ListObjects`; `can_complete` checked on `/tasks/{id}/complete` (FR-1.5).
-- [ ] Second tenant (Bolt) with diverging YAML + TenantConfig (FR-X.2).
-- [ ] LiteLLM virtual key per tenant; budget-exhausted → `needs_attention` human task.
-- [ ] `ai` profile: Langfuse (shared ClickHouse/Redis/MinIO), OTel collector; cost per run in the UI (FR-2.4).
-- [ ] Audit log hash chain; `definition_version` + `config_version` on every entry (FR-X.1).
+- [x] OpenFGA model with the RBAC capability matrix ([LLD §7](03-lld.md#7-authorization-openfga)); every route goes through `authorize()` with contextual role tuples (FR-X.5). OpenFGA v1.10 joins `core`, and the model is generated to `model.json` (`make gen`, CI drift check).
+- [x] Approver limits from `TenantConfig.approval_limits`. Instead of the engine writing assignee/approver tuples, the facts are sent per check as contextual tuples built from the tenant-scoped row, using the run's pinned config, so there's no dual write and no backfill ([ADR-026](06-adrs.md#adr-026-openfga-holds-only-the-model-every-fact-is-a-contextual-tuple)). Approval hierarchy: the assigned role plus every role with an equal or higher limit; a controller-assigned task stays with the controller (dual control).
+- [x] Keycloak MFA policy for privileged roles: `scripts/staging_realm.py` generates `infra/keycloak-staging/realm-nova.json`.
+  - OTP is required for `platform_admin`, `tenant_admin`, `finance` and `controller` through the `mfa_required` composite and a role-conditioned browser flow; identity-first organization login is kept.
+  - The staging realm has no dev users and no password grants, and adds a password policy and explicit event types. Login and admin events were already on.
+- [x] The inbox lists only what the caller can act on: open rows are batch-checked for `can_claim` (instead of `ListObjects`, ADR-026). `can_claim`/`can_complete` are checked with `{amount}` (FR-1.5), and an over-limit attempt is a 403 `above_approval_limit`, shown in the decision bar.
+- [x] Second tenant (Bolt) with diverging YAML + TenantConfig (FR-X.2): `bol_intake` sends any validator finding to a human with a 2 h SLA, and `demo_approval` adds a controller second sign-off at or above `dual_control_above`. Bolt has its own limits and thresholds. New users: `lead@bolt`, `fin@bolt`, `admin@bolt`, `viewer@acme`.
+- [x] LiteLLM virtual key per tenant, derived (HMAC) and provisioned with `TenantConfig.llm_budget_usd` ([ADR-028](06-adrs.md#adr-028-per-tenant-litellm-virtual-keys-derived-rather-than-stored)). Budget exhausted → non-retryable `BudgetExceeded` → `needs_attention` task saying so → Retry after the budget is raised.
+- [x] `ai` profile: Langfuse v3 on the shared Postgres/ClickHouse/Redis/MinIO; an OTel collector in `core` fans out to Jaeger, and to Langfuse with `make up-full` ([ADR-029](06-adrs.md#adr-029-otel-collector-in-core-langfuse-v3-in-the-ai-profile-via-otlp)). LLM spans carry GenAI attributes (model, tokens, cost), `run_steps.trace_id` is written, and the run page links the trace (Jaeger) and LLM calls (Langfuse). Cost per run was already shown (FR-2.4).
+- [x] Audit log hash chain via a DB trigger, with `definition_version` + `config_version` on every entry (FR-X.1, [ADR-027](06-adrs.md#adr-027-audit-log-hash-chain-in-a-postgres-trigger)). The API audits publish, config publish and upload. `GET /audit`, `GET /audit/verify`.
+- [x] Admin screen (`/admin`): LLM spend vs budget (80% warning), a TenantConfig editor (limits, budget, thresholds → new version), and the audit log with a chain-verified badge. The nav follows `/me` capabilities.
 
 ### Tests
-- [ ] Cross-tenant suite: Postgres, MinIO, Weaviate, FGA (ClickHouse is added in M6).
-- [ ] RBAC matrix: every role × capability against the allow/deny table in LLD §7, incl. `platform_admin` has no tenant data access.
-- [ ] Token tests: wrong `aud`/`iss`, expired, missing org, tampered signature → 401.
-- [ ] Audit chain verification job.
+- [x] Cross-tenant suite:
+  - Postgres RLS (`test_rls.py`)
+  - API 404s for Bolt on Acme runs, tasks, cancel, lists (`test_engine_db.py`)
+  - documents + MinIO `tenant/<id>/` keys (`test_w1_documents.py`)
+  - FGA: roles never cross tenants (`test_rbac.py`)
+  - Weaviate joins when Weaviate is in the stack (not yet); ClickHouse in M6.
+- [x] RBAC matrix: every role × capability against LLD §7 on real OpenFGA, including `platform_admin` getting no tenant data, the `within_limit` boundary (= limit allowed, +0.01 denied, string amounts) and dual control (`tests/integration/test_rbac.py`, 18 cases).
+- [x] Token tests: wrong `aud`/`iss`, expired, missing org and tampered tokens → generic 401 over HTTP (`tests/unit/test_auth.py`), on top of the verifier tests.
+- [x] Audit chain verification: a job (`make audit-verify`) plus a test in which an owner-level edit is caught at its seq.
+- [x] Budget: LiteLLM's refusal shape → `BudgetExceeded`, with no decide fallback and per-tenant key headers (unit); engine time-skipping test: needs_attention task with `error_type`, no retries, Retry completes.
 
 ### Exit criteria
-- [ ] A Bolt user can't see Acme runs; L1 can't approve above their limit through the API.
-- [ ] Cost per run visible; budget stop degrades to a human task.
+- [x] A Bolt user can't see Acme runs; L1 can't approve above their limit through the API. Integration tests, plus headed Chrome on 2026-10-10: `lead@acme` is refused 20,000 ("amount 20000 is above your approval limit"), `fin@acme` approves, and `ops@bolt` gets a 404 on the Acme run.
+- [x] Cost per run visible; budget stop degrades to a human task. Engine + unit tests; live, the per-tenant keys are provisioned and spend shows in Admin. In `LLM_MODE=free` the gateway skips budget checks for $0 models (ADR-028), so the live stop needs `cheap`/`demo`.
+
+### Verification (2026-10-10)
+- **Automated:** lint, mypy, import contracts, unit 101, engine 22 (100% branch), vitest 23, integration 42, gen drift, and the web build all pass.
+- **Live stack (core + ai):** every dev user's `/me` capabilities match the matrix, and each inbox shows only actionable tasks. The audit backfill verified 1,671 existing rows. One run is one trace (6/6 steps), and Langfuse shows its generations.
+- **Headed Chrome walkthrough, 8/8:**
+  - over-limit refusal, then finance approves
+  - Bolt isolation
+  - Admin: budget, config publish re-provisions the key, chain verified
+  - auditor is read-only; viewer has no Admin
+  - Jaeger and Langfuse links
+- **Found and fixed during the build:**
+  - audit rows from task updates would have been dropped (`run_id` was empty on updates)
+  - approval tasks let any role within its limit act, so a controller's dual-control task was approvable by finance
+  - Langfuse's default Redis password broke its queue
 
 ---
 

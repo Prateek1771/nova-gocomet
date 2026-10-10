@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy import text
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -26,17 +27,30 @@ from nova_engine.contracts import (
 TERMINAL = {"completed", "rejected", "cancelled", "failed"}
 
 
+def _trace_id() -> str | None:
+    """The run's OTel trace (Temporal's interceptor propagates it into activities): the step links to
+    Jaeger / Langfuse by it (08 §5 traceability)."""
+    ctx = trace.get_current_span().get_span_context()
+    return format(ctx.trace_id, "032x") if ctx.is_valid else None
+
+
 def _j(v: Any) -> str:
     return json.dumps(v)
 
 
 async def _audit(
-    s: Any, tenant: str, actor_type: str, actor: str, action: str, subject: str, ev: Any
+    s: Any, tenant: str, run_id: str, actor_type: str, actor: str, action: str, subject: str, ev: Any
 ) -> None:
+    """One audit row, stamped with the run's definition and config versions (09 §7); the DB trigger
+    chains it (migration 0004)."""
     await s.execute(
-        text("""insert into audit_log (tenant_id, actor_type, actor_id, action, subject, evidence)
-                values (:t, :at, :a, :ac, :s, cast(:e as jsonb))"""),
-        {"t": tenant, "at": actor_type, "a": actor, "ac": action, "s": subject, "e": _j(ev)},
+        text("""insert into audit_log (tenant_id, actor_type, actor_id, action, subject, evidence,
+                  definition_version, config_version)
+                values (:t, :at, :a, :ac, :s, cast(:e as jsonb),
+                  (select d.version from workflow_runs r join workflow_definitions d
+                     on d.id = r.definition_id where r.id = cast(:r as uuid)),
+                  (select config_version from workflow_runs where id = cast(:r as uuid)))"""),
+        {"t": tenant, "r": run_id, "at": actor_type, "a": actor, "ac": action, "s": subject, "e": _j(ev)},
     )
 
 
@@ -68,9 +82,16 @@ async def project_step(e: StepEvent) -> None:
             pass  # run-level transition only (cancel)
         elif e.status == "running":
             await s.execute(
-                text("""insert into run_steps (id, run_id, tenant_id, node_id, node_type, status)
-                        values (:id, :r, :t, :n, :nt, 'running') on conflict (id) do nothing"""),
-                {"id": e.step_id, "r": e.run_id, "t": e.tenant_id, "n": e.node_id, "nt": e.node_type},
+                text("""insert into run_steps (id, run_id, tenant_id, node_id, node_type, status, trace_id)
+                        values (:id, :r, :t, :n, :nt, 'running', :tr) on conflict (id) do nothing"""),
+                {
+                    "id": e.step_id,
+                    "r": e.run_id,
+                    "t": e.tenant_id,
+                    "n": e.node_id,
+                    "nt": e.node_type,
+                    "tr": _trace_id(),
+                },
             )
         else:
             await s.execute(
@@ -88,6 +109,7 @@ async def project_step(e: StepEvent) -> None:
         await _audit(
             s,
             e.tenant_id,
+            e.run_id,
             "system",
             "engine",
             f"step.{e.status}",
@@ -137,9 +159,15 @@ async def write_task(w: TaskWrite) -> None:
                 },
             )
         actor_type = "system" if w.actor == "system" else "user"
+        run_id = w.run_id or str(
+            (
+                await s.execute(text("select run_id from human_tasks where id = :id"), {"id": w.task_id})
+            ).scalar()
+        )
         await _audit(
             s,
             w.tenant_id,
+            run_id,
             actor_type,
             w.actor,
             f"task.{w.status}",

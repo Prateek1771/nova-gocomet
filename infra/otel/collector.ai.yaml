@@ -1,0 +1,19 @@
+# collector.yaml + Langfuse's OTLP endpoint (ai profile). LLM spans carry gen_ai.* attributes, so
+# Langfuse shows them as generations with model, tokens and cost. Dev project keys from LANGFUSE_INIT_*.
+receivers:
+  otlp:
+    protocols:
+      http: { endpoint: 0.0.0.0:4318 }
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch: {}
+exporters:
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
+  otlphttp/langfuse:
+    endpoint: http://langfuse-web:3000/api/public/otel
+    headers:
+      Authorization: Basic cGstbGYtbm92YS1kZXY6c2stbGYtbm92YS1kZXY=  # base64(pk-lf-nova-dev:sk-lf-nova-dev)
+service:
+  pipelines:
+    traces: { receivers: [otlp], processors: [batch], exporters: [otlphttp/jaeger, otlphttp/langfuse] }

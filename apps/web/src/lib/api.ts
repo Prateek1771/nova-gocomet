@@ -45,6 +45,8 @@ export type Me = {
   name: string | null;
   tenant: { id: string; slug: string; name: string } | null;
   roles: string[];
+  /** OpenFGA capabilities on the tenant (LLD §7); the shell hides what's not allowed, the API enforces. */
+  capabilities: string[];
 };
 
 /** Deduped per request: layout and page both need it. */

@@ -87,14 +87,23 @@ class NovaWorkflow:
         return out
 
     async def attention(self, node: Node, err: Exception) -> str:
-        """Retries exhausted / bad expression → `needs_attention` + a task to retry or abort (09 §7)."""
+        """Retries exhausted / budget exhausted / bad expression → `needs_attention` + a task to retry or
+        abort (09 §7). The task carries the error type so the screen can say what to fix first."""
+        cause = getattr(err, "cause", None) or err
+        kind = getattr(cause, "type", None) or type(cause).__name__
+        title = (
+            f"LLM budget exhausted at {node.id!r}"
+            if kind == "BudgetExceeded"
+            else f"Step {node.id!r} failed: {cause}"
+        )
         fix = HumanTaskNode(
             id=node.id,
             type="human_task",
-            title=f"Step {node.id!r} failed: {getattr(err, 'cause', None) or err}"[:200],
+            title=title[:200],
             assignee=Assignee(role=self.config.get("attention_role", "tenant_admin")),
             app="step_failure",
             outputs=["retry", "abort"],
+            **{"with": {"error_type": kind, "message": str(cause)[:500]}},
         )
         s = Step(str(workflow.uuid4()), self.visits.get(node.id, 0))
         out = await human_task(self, fix, s, waiting="needs_attention")

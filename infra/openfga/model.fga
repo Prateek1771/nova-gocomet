@@ -1,4 +1,5 @@
-# Source of truth for authz (LLD §7). Loaded into OpenFGA in M4; CI validates it from M0.
+# Source of truth for authz (LLD §7). `make gen` writes model.json, which the API loads into OpenFGA.
+# Only roles and structure are sent per request as contextual tuples (ADR-019, ADR-026); nothing is stored.
 model
   schema 1.1
 
@@ -49,10 +50,12 @@ type run
 type task
   relations
     define run: [run]
-    define assignee: [user, tenant#ops_exec, tenant#ops_lead, tenant#finance, tenant#controller]
+    # tenant_admin: needs_attention tasks (failed steps, exhausted budget) default to it
+    define assignee: [user, tenant#tenant_admin, tenant#ops_exec, tenant#ops_lead, tenant#finance, tenant#controller]
     define approver: [user with within_limit, tenant#ops_lead with within_limit, tenant#finance with within_limit, tenant#controller with within_limit]
     define can_view: assignee or approver or can_view from run
     define can_complete: assignee or approver
+    define can_claim: can_complete
 
 condition within_limit(amount: double, limit: double) {
   amount <= limit

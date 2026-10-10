@@ -13,7 +13,7 @@ from temporalio.client import RPCTimeoutOrCancelledError, WorkflowUpdateFailedEr
 from temporalio.service import RPCError, RPCStatusCode
 
 from nova_api import definitions
-from nova_api.authz import TenantDep, authorize
+from nova_api.authz import TASK_FACTS, Fact, TenantDep, allowed, authorize, task_facts, workflow_tuples
 from nova_api.errors import ApiError
 from nova_core import db
 from nova_core import temporal as t
@@ -62,19 +62,26 @@ _COLS = "id, run_id, node_id, title, app_key, status, assignee_role, assignee_us
 
 @router.get("")
 async def inbox(c: TenantDep, mine: bool = False, status: str | None = None) -> list[TaskOut]:
-    """Open work by default. `mine=true`: tasks I've claimed.
-    ponytail: role-based inbox (OpenFGA ListObjects can_view) arrives in M4; until then every open task
-    in the tenant is listed."""
+    """Open work the caller can act on (OpenFGA `can_claim`: their role is the assignee, or an approver
+    within its limit). `mine=true`: tasks I've claimed. `status=done` lists finished work they could see."""
     await authorize(c, "can_view", f"tenant:{c.tenant_id}")
     async with db.tenant_session(c.tenant_id) as s:
-        rows = await s.execute(
-            text(f"""select {_COLS} from human_tasks
-                     where (cast(:st as text) is null and status <> 'done' or status = :st)
-                       and (not :mine or assignee_user = cast(:u as uuid))
-                     order by due_at nulls last limit 200"""),  # noqa: S608 (constant column list)
-            {"st": status, "mine": mine, "u": c.sub},
-        )
-        return [_task(r) for r in rows]
+        rows = (
+            await s.execute(
+                text(f"""select {", ".join("h." + k for k in _COLS.split(", "))}, {TASK_FACTS}
+                         where (cast(:st as text) is null and h.status <> 'done' or h.status = :st)
+                           and (not :mine or h.assignee_user = cast(:u as uuid))
+                         order by h.due_at nulls last limit 200"""),  # noqa: S608 (constant SQL parts)
+                {"st": status, "mine": mine, "u": c.sub},
+            )
+        ).all()
+    rel = "can_view" if status == "done" else "can_claim"
+    facts: list[Fact] = []
+    for r in rows:
+        tuples, ctx = task_facts(c.tenant_id, r)
+        facts.append((rel, f"task:{r.id}", workflow_tuples(c.tenant_id, r.key, r.run_id) + tuples, ctx))
+    ok = await allowed(c, facts) if facts else []
+    return [_task(r) for r, y in zip(rows, ok, strict=True) if y]
 
 
 async def _update(c: TenantDep, task_id: uuid.UUID, name: str, args: list[Any]) -> TaskOut:
@@ -148,7 +155,7 @@ def check_output(app_key: str, decision: str, payload: dict[str, Any]) -> None:
 
 @router.post("/{task_id}/complete")
 async def complete(c: TenantDep, task_id: uuid.UUID, body: CompleteIn) -> TaskOut:
-    # M4: context={"amount": …} so OpenFGA `within_limit` checks the TenantConfig approval limit
+    # the amount in the task payload is checked against the approver limit (OpenFGA `within_limit`)
     await authorize(c, "can_complete", f"task:{task_id}")
     async with db.tenant_session(c.tenant_id) as s:
         app_key = (

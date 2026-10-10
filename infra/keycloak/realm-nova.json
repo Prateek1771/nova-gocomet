@@ -314,6 +314,86 @@
       }
     },
     {
+      "username": "viewer@acme",
+      "email": "viewer@acme.test",
+      "firstName": "Vic",
+      "lastName": "Viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "viewer"
+        ]
+      }
+    },
+    {
+      "username": "lead@bolt",
+      "email": "lead@bolt.test",
+      "firstName": "Lea",
+      "lastName": "Bolt",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "ops_lead"
+        ]
+      }
+    },
+    {
+      "username": "fin@bolt",
+      "email": "fin@bolt.test",
+      "firstName": "Fin",
+      "lastName": "Bolt",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "finance"
+        ]
+      }
+    },
+    {
+      "username": "admin@bolt",
+      "email": "admin@bolt.test",
+      "firstName": "Ada",
+      "lastName": "Bolt",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "nova-api": [
+          "tenant_admin"
+        ]
+      }
+    },
+    {
       "username": "platform",
       "email": "platform@nova.test",
       "firstName": "Pat",
@@ -373,6 +453,10 @@
         {
           "username": "admin@acme",
           "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "viewer@acme",
+          "membershipType": "UNMANAGED"
         }
       ]
     },
@@ -389,6 +473,18 @@
       "members": [
         {
           "username": "ops@bolt",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "lead@bolt",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "fin@bolt",
+          "membershipType": "UNMANAGED"
+        },
+        {
+          "username": "admin@bolt",
           "membershipType": "UNMANAGED"
         }
       ]

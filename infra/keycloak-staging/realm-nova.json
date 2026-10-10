@@ -1,0 +1,368 @@
+{
+  "realm": "nova",
+  "displayName": "Nova",
+  "enabled": true,
+  "organizationsEnabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 10,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "roles": {
+    "client": {
+      "nova-api": [
+        {
+          "name": "platform_admin",
+          "description": "Manage tenants; no tenant data access",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa_required"
+            ]
+          }
+        },
+        {
+          "name": "tenant_admin",
+          "description": "Org users/roles, TenantConfig, budgets",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa_required"
+            ]
+          }
+        },
+        {
+          "name": "process_designer",
+          "description": "FDE: edit and publish workflows and apps"
+        },
+        {
+          "name": "ops_exec",
+          "description": "Upload docs, start runs, complete assigned tasks"
+        },
+        {
+          "name": "ops_lead",
+          "description": "Ops exec + approve within limit"
+        },
+        {
+          "name": "finance",
+          "description": "Approve within limit, analytics",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa_required"
+            ]
+          }
+        },
+        {
+          "name": "controller",
+          "description": "Final approver",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa_required"
+            ]
+          }
+        },
+        {
+          "name": "auditor",
+          "description": "Read runs, analytics and audit log"
+        },
+        {
+          "name": "viewer",
+          "description": "Read only"
+        }
+      ]
+    },
+    "realm": [
+      {
+        "name": "mfa_required",
+        "description": "Privileged: OTP at every browser login (M4)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "nova-api",
+      "name": "Nova API (audience + roles)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "nova-web",
+      "name": "Nova web (Next.js BFF)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${NOVA_STAGING_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://nova-staging.example/*"
+      ],
+      "webOrigins": [
+        "https://nova-staging.example"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://nova-staging.example/*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "optionalClientScopes": [
+        "organization"
+      ],
+      "protocolMappers": [
+        {
+          "name": "audience nova-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "nova-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "organization",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-organization-membership-mapper",
+          "config": {
+            "claim.name": "organization",
+            "multivalued": "true",
+            "addOrganizationId": "true",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "nova-admin",
+      "name": "Nova provisioning (service account)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${NOVA_STAGING_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-nova-admin",
+      "enabled": true,
+      "serviceAccountClientId": "nova-admin",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "manage-realm",
+          "view-realm"
+        ]
+      }
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Acme Logistics",
+      "alias": "acme",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "acme.test",
+          "verified": false
+        }
+      ],
+      "members": []
+    },
+    {
+      "name": "Bolt Freight",
+      "alias": "bolt",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "bolt.test",
+          "verified": false
+        }
+      ],
+      "members": []
+    }
+  ],
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and notUsername and passwordHistory(5)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "LOGOUT_ERROR",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "REFRESH_TOKEN",
+    "REFRESH_TOKEN_ERROR",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "UPDATE_PASSWORD",
+    "UPDATE_CREDENTIAL",
+    "REMOVE_CREDENTIAL",
+    "USER_DISABLED_BY_PERMANENT_LOCKOUT",
+    "USER_DISABLED_BY_TEMPORARY_LOCKOUT",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR"
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "browser-mfa",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "browser-mfa organization",
+          "requirement": "ALTERNATIVE",
+          "priority": 26,
+          "authenticatorFlow": true,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "browser-mfa forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "authenticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-mfa organization",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "flowAlias": "browser-mfa conditional organization",
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "authenticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-mfa conditional organization",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "organization",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-mfa forms",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "browser-mfa privileged otp",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "authenticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-mfa privileged otp",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "mfa required role"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "mfa required role",
+      "config": {
+        "condUserRole": "mfa_required",
+        "negate": "false"
+      }
+    }
+  ],
+  "browserFlow": "browser-mfa"
+}

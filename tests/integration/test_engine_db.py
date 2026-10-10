@@ -20,6 +20,15 @@ from nova_core.auth import Principal
 from nova_core.settings import get_settings
 
 ACME = "acme"
+ROLES = {
+    "ctrl": "controller",
+    "audit": "auditor",
+    "ops": "ops_exec",
+    "lead": "ops_lead",
+    "fin": "finance",
+    "designer": "process_designer",
+    "admin": "tenant_admin",
+}
 GATED = """
 metadata: {key: gated}
 nodes:
@@ -42,6 +51,9 @@ async def stack(pg: tuple[str, str]) -> AsyncIterator[dict[str, Any]]:
     os.environ.update(DATABASE_URL=app_url, MIGRATIONS_DATABASE_URL=owner)
     for cached in (get_settings, db.engine, db._sessions):
         cached.cache_clear()
+    from nova_api import fga
+
+    fga._http = fga._store = None  # bound to the previous module's event loop
     from nova_api import seed
 
     await seed.main()  # tenants, config v1, demo_approval v1
@@ -52,7 +64,8 @@ async def stack(pg: tuple[str, str]) -> AsyncIterator[dict[str, Any]]:
     from nova_engine.interpreter import NovaWorkflow
 
     async with db.session() as s:
-        acme = (await s.execute(text("select id from tenants where slug = 'acme'"))).scalar_one()
+        tenants = {r.slug: r.id for r in await s.execute(text("select slug, id from tenants"))}
+    acme = tenants[ACME]
     users: dict[str, str] = {}
 
     def as_user(name: str) -> httpx.AsyncClient:
@@ -61,10 +74,19 @@ async def stack(pg: tuple[str, str]) -> AsyncIterator[dict[str, Any]]:
             transport=httpx.ASGITransport(app=app), base_url="http://t/api/v1", headers={"x-user": name}
         )
 
-    async def override(request: Request) -> TenantCaller:  # the x-user header picks the principal
+    async def override(request: Request) -> TenantCaller:  # x-user "<name>[@bolt]" picks the principal
         name = request.headers["x-user"]
-        p = Principal(sub=users[name], email=None, name=name, org_id=None, org_alias=ACME, roles=frozenset())
-        return TenantCaller(Caller(p, acme, ACME), acme)
+        role, _, slug = name.partition("@")
+        slug = slug or ACME
+        p = Principal(
+            sub=users[name],
+            email=None,
+            name=name,
+            org_id=None,
+            org_alias=slug,
+            roles=frozenset({ROLES[role]}),
+        )
+        return TenantCaller(Caller(p, tenants[slug], slug), tenants[slug])
 
     app.dependency_overrides[tenant_caller] = override
     async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -109,7 +131,7 @@ async def test_run_lifecycle_through_the_api(stack: dict[str, Any]) -> None:
     ).status_code == 409
     assert (await lead.post(f"/tasks/{task['id']}/claim")).json()["status"] == "claimed"
     assert [x["id"] for x in (await lead.get("/tasks?mine=true")).json()] == [task["id"]]
-    assert (await ops.post(f"/tasks/{task['id']}/claim")).status_code == 409
+    assert (await ops.post(f"/tasks/{task['id']}/claim")).status_code == 403  # ops_exec: not an approver
     done = await lead.post(
         f"/tasks/{task['id']}/complete", json={"decision": "approved", "payload": {"n": 1}}
     )
@@ -135,15 +157,35 @@ async def test_run_lifecycle_through_the_api(stack: dict[str, Any]) -> None:
     assert audit == ["task.open", "task.claimed", "task.done"]
 
 
+async def test_approval_limit_is_enforced(stack: dict[str, Any]) -> None:
+    """07 M4 exit: L1 (ops_lead, limit 10000 in Acme's TenantConfig) can't approve above it via the API;
+    finance (50000) can. The limit comes from the run's pinned config, checked by OpenFGA within_limit."""
+    ops, lead, fin = stack["as"]("ops"), stack["as"]("lead"), stack["as"]("fin")
+    r = await ops.post("/runs", json={"workflow_key": "demo_approval", "input": {"amount": 20000}})
+    run_id = r.json()["id"]
+    run = await until(lambda: run_of(ops, run_id), lambda b: b["tasks"])
+    tid = run["tasks"][0]["id"]
+    assert tid not in [x["id"] for x in (await lead.get("/tasks")).json()]
+    denied = await lead.post(f"/tasks/{tid}/claim")
+    assert denied.status_code == 403 and denied.json()["error"]["code"] == "above_approval_limit"
+    denied = await lead.post(f"/tasks/{tid}/complete", json={"decision": "approved"})
+    assert denied.status_code == 403
+    assert tid in [x["id"] for x in (await fin.get("/tasks")).json()]
+    assert (await fin.post(f"/tasks/{tid}/claim")).json()["status"] == "claimed"
+    done = await fin.post(f"/tasks/{tid}/complete", json={"decision": "approved"})
+    assert done.json()["status"] == "done"
+
+
 async def test_cancel_through_the_api(stack: dict[str, Any]) -> None:
-    ops = stack["as"]("ops")
+    ops, designer = stack["as"]("ops"), stack["as"]("designer")
     run_id = (
         await ops.post("/runs", json={"workflow_key": "demo_approval", "input": {"amount": 9000}})
     ).json()["id"]
     await until(lambda: run_of(ops, run_id), lambda b: b["status"] == "waiting_human")
-    assert (await ops.post(f"/runs/{run_id}/cancel")).status_code == 202
+    assert (await ops.post(f"/runs/{run_id}/cancel")).status_code == 403  # can_cancel = can_publish
+    assert (await designer.post(f"/runs/{run_id}/cancel")).status_code == 202
     await until(lambda: run_of(ops, run_id), lambda b: b["status"] == "cancelled")
-    assert (await ops.post(f"/runs/{run_id}/cancel")).status_code == 409
+    assert (await designer.post(f"/runs/{run_id}/cancel")).status_code == 409
 
 
 async def test_idempotent_action(stack: dict[str, Any]) -> None:
@@ -186,8 +228,10 @@ async def test_config_is_pinned_at_run_start(stack: dict[str, Any]) -> None:
     # 1500 is over v1's auto_approve_below (1000) but under the 2000 published mid-run
     run_id = (await ops.post("/runs", json={"workflow_key": "gated", "input": {"amount": 1500}})).json()["id"]
     run = await until(lambda: run_of(ops, run_id), lambda b: b["tasks"])
-    cfg = (await designer.get("/tenant-config")).json()["config"]
-    v2 = await designer.put("/tenant-config", json={**cfg, "auto_approve_below": 2000})
+    admin = stack["as"]("admin")
+    cfg = (await admin.get("/tenant-config")).json()["config"]
+    assert (await designer.put("/tenant-config", json=cfg)).status_code == 403  # can_edit_config
+    v2 = await admin.put("/tenant-config", json={**cfg, "auto_approve_below": 2000})
     assert v2.json()["version"] == 2
 
     tid = run["tasks"][0]["id"]
@@ -210,3 +254,67 @@ async def test_publish_rejects_invalid_and_versions_are_immutable(stack: dict[st
     v1 = (await d.get("/workflows/gated/versions/1")).json()
     assert v1["yaml"] == GATED and v1["status"] == "published"
     assert (await d.post("/workflows/gated/validate", json={"yaml": GATED})).json()["valid"]
+
+
+async def test_bolt_cannot_reach_acme(stack: dict[str, Any]) -> None:
+    """07 M4 exit: a Bolt user can't see Acme runs (or tasks, or their facts); RLS makes them 404."""
+    ops, bolt = stack["as"]("ops"), stack["as"]("lead@bolt")
+    run_id = (
+        await ops.post("/runs", json={"workflow_key": "demo_approval", "input": {"amount": 7000}})
+    ).json()["id"]
+    run = await until(lambda: run_of(ops, run_id), lambda b: b["tasks"])
+    tid = run["tasks"][0]["id"]
+    assert (await bolt.get(f"/runs/{run_id}")).status_code == 404
+    assert (await bolt.get(f"/tasks/{tid}")).status_code == 404
+    assert (await bolt.post(f"/tasks/{tid}/claim")).status_code == 404
+    assert (await bolt.post(f"/runs/{run_id}/cancel")).status_code == 404
+    assert run_id not in [r["id"] for r in (await bolt.get("/runs")).json()]
+    assert tid not in [x["id"] for x in (await bolt.get("/tasks")).json()]
+
+
+async def test_bolt_runs_its_own_process(stack: dict[str, Any]) -> None:
+    """FR-X.2: Bolt's demo_approval adds a controller sign-off at/above its dual_control_above (20000),
+    and Bolt's lower limits apply (finance 25000)."""
+    ops, fin, ctrl = stack["as"]("ops@bolt"), stack["as"]("fin@bolt"), stack["as"]("ctrl@bolt")
+    run_id = (
+        await ops.post("/runs", json={"workflow_key": "demo_approval", "input": {"amount": 22000}})
+    ).json()["id"]
+    run = await until(lambda: run_of(ops, run_id), lambda b: b["tasks"])
+    first = run["tasks"][0]["id"]
+    await fin.post(f"/tasks/{first}/claim")
+    assert (await fin.post(f"/tasks/{first}/complete", json={"decision": "approved"})).status_code == 200
+    run = await until(lambda: run_of(ops, run_id), lambda b: b["tasks"] and b["tasks"][0]["id"] != first)
+    second = run["tasks"][0]
+    assert second["assignee_role"] == "controller"
+    assert (await fin.post(f"/tasks/{second['id']}/claim")).status_code == 403
+    await ctrl.post(f"/tasks/{second['id']}/claim")
+    await ctrl.post(f"/tasks/{second['id']}/complete", json={"decision": "approved"})
+    run = await until(lambda: run_of(ops, run_id), lambda b: b["status"] == "completed")
+    assert [s["node_id"] for s in run["steps"]][-3:] == ["second", "notify", "done"]
+
+
+async def test_audit_chain_verifies_and_detects_tampering(stack: dict[str, Any], pg: tuple[str, str]) -> None:
+    """FR-X.1: every row is chained and stamped with its versions; an edit (even by the table owner)
+    is caught at its seq. Only auditor / tenant_admin may read it."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    ops, auditor = stack["as"]("ops"), stack["as"]("audit")
+    assert (await ops.get("/audit")).status_code == 403
+    ok = (await auditor.get("/audit/verify")).json()
+    assert ok["valid"] and ok["entries"] > 0, ok
+    rows = (await auditor.get("/audit?limit=500")).json()
+    task_rows = [r for r in rows if r["subject"].startswith("task:")]
+    assert task_rows and all(r["definition_version"] and r["config_version"] for r in task_rows)
+    published = [r for r in rows if r["action"] == "workflow.published"]
+    assert published and published[0]["definition_version"]
+
+    victim = rows[len(rows) // 2]
+    owner = create_async_engine(pg[0])
+    async with owner.begin() as c:  # owner bypasses the app role's no-update grant, not the chain
+        await c.execute(text("select set_config('app.tenant_id', :t, true)"), {"t": str(stack["tenant"])})
+        await c.execute(
+            text("update audit_log set actor_id = 'someone-else' where seq = :s"), {"s": victim["seq"]}
+        )
+    await owner.dispose()
+    bad = (await auditor.get("/audit/verify")).json()
+    assert not bad["valid"] and bad["broken"][0]["seq"] == victim["seq"], bad

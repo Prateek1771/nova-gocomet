@@ -18,6 +18,9 @@ export const env = {
   // operator consoles linked from the run view (dev defaults; set per environment)
   temporalUiUrl: req("TEMPORAL_UI_URL", "http://localhost:8233"),
   jaegerUiUrl: req("JAEGER_UI_URL", "http://localhost:16686"),
+  // Langfuse (ai profile): LLM generations per run. Empty = link hidden (core profile only).
+  langfuseUrl: process.env.LANGFUSE_URL ?? "",
+  langfuseProject: process.env.LANGFUSE_PROJECT ?? "nova-dev",
 };
 
 export const secureCookies = env.appUrl.startsWith("https://");

@@ -415,35 +415,29 @@ condition within_limit(amount: double, limit: double) {
 
 `platform_admin` manages tenants but has **no tenant-data capability** (no RLS bypass). Break-glass support access (time-boxed, audited) is a stretch item.
 
-**Who writes which tuples:**
+**Where the facts come from (ADR-026, superseding the persisted-tuple part of ADR-019).** OpenFGA stores only the model (`infra/openfga/model.json`, generated from `model.fga`). Every check sends the caller's roles *and* the object's structure as contextual tuples, read from the tenant-scoped row (`nova_api.authz`):
 
-| Tuples | Written by | Example |
+| Contextual tuple | Built from | Example |
 |---|---|---|
-| Roles (`tenant:<t>#<role>@user:<sub>`) | **Nobody.** Built per request from the token's `nova-api` client roles and sent as contextual tuples | `tenant:acme#finance@user:9f1c…` |
-| `platform:nova#admin@user:<sub>` | Contextual, from the `platform_admin` role | |
-| `workflow:<id>#tenant@tenant:<t>` | API, on workflow create | |
-| `run:<id>#workflow@workflow:<id>` | Engine, on run start | |
-| `task:<id>#run@run:<id>` | Engine, on task create | |
-| `task:<id>#assignee@…` | Engine, from the node's `assignee` (role or user); delegation adds a user | `task:T#assignee@tenant:acme#ops_exec` |
-| `task:<id>#approver@… with within_limit{limit}` | Engine; `limit` = `TenantConfig.approval_limits[role]` from the run's pinned `config_version` | `task:T#approver@tenant:acme#finance` `{limit: 50000}` |
+| Roles (`tenant:<t>#<role>@user:<sub>`) | the token's `nova-api` client roles | `tenant:<acme-uuid>#finance@user:9f1c…` |
+| `platform:nova#admin@user:<sub>` | the `platform_admin` role | |
+| `workflow:<t>/<key>#tenant@tenant:<t>` | the object id | |
+| `run:<id>#workflow@workflow:<t>/<key>` | `workflow_runs` → `workflow_definitions.key` | |
+| `task:<id>#run@run:<id>` | `human_tasks.run_id` | |
+| `task:<id>#assignee@tenant:<t>#<role>` | `human_tasks.assignee_role` (tasks without an `amount`) | `…#assignee@tenant:<t>#ops_exec` |
+| `task:<id>#approver@tenant:<t>#<role> with within_limit{limit}` | tasks whose payload has `amount`: the assigned role and every role with an equal or higher limit in the run's **pinned** `TenantConfig.approval_limits` (null = unlimited) | `…#approver@tenant:<t>#finance` `{limit: 50000}` |
 
-`can_complete` is checked with `{amount}` from the task payload. "Finance up to $50K" lives in versioned config, gets copied onto the task when it's created, and is audited with it. It's never in code, and the JWT alone never grants it.
+An approval task gets no plain assignee tuple, so no role bypasses its limit. A task assigned to the unlimited controller stays with the controller: dual control. Model deltas from the original: `task.can_claim = can_complete`, and `tenant#tenant_admin` is assignable, because needs_attention tasks default to it. Object ids use the tenant UUID: `tenant:<uuid>`, `workflow:<uuid>/<key>`.
 
-**Check call** (the FastAPI `require` dependency):
+**Check call** (`nova_api.authz.authorize`, used by every route):
 
 ```python
-await fga.check(
-    user=f"user:{p.sub}",
-    relation="can_complete",
-    object=f"task:{task_id}",
-    context={"amount": task.payload["amount_usd"]},
-    contextual_tuples=[
-        {"user": f"user:{p.sub}", "relation": r, "object": f"tenant:{p.tenant_slug}"} for r in p.roles
-    ],
-)
+tuples, ctx = await _facts(c, obj)  # RLS read; another tenant's id → 404 before OpenFGA is asked
+ok = await fga.check(Check(f"user:{c.sub}", relation, obj, role_tuples(c) + tuples, ctx))
+# ctx = {"amount": task.payload["amount"]} for approval tasks; deny → 403 (`above_approval_limit`)
 ```
 
-The inbox uses `ListObjects(user, can_view, task)` with the same contextual tuples. A role revoked in Keycloak stops working within one access-token lifetime (5 min).
+The inbox lists open rows and batch-checks `can_claim` (50 per OpenFGA call), so each user sees only what they can act on. `/me` returns the caller's tenant capabilities, which the shell uses to hide what it can't do; the API still enforces every route. OpenFGA unreachable → 503 (fail closed). A role revoked in Keycloak stops working within one access-token lifetime (5 min).
 
 ## 7a. Authentication (Keycloak)
 

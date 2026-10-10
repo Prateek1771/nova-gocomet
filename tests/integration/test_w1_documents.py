@@ -57,6 +57,9 @@ async def w1(pg: tuple[str, str]) -> AsyncIterator[dict[str, Any]]:
     os.environ.update(DATABASE_URL=app_url, MIGRATIONS_DATABASE_URL=owner)
     for cached in (get_settings, db.engine, db._sessions):
         cached.cache_clear()
+    from nova_api import fga
+
+    fga._http = fga._store = None  # bound to the previous module's event loop
     from nova_agents import activities as agent_acts
     from nova_agents import llm
     from nova_api import seed
@@ -79,12 +82,21 @@ async def w1(pg: tuple[str, str]) -> AsyncIterator[dict[str, Any]]:
     storage.put, storage.get = put, get  # type: ignore[assignment]
     llm.use(llm.LLM(transport=httpx.MockTransport(fake_model)))
     async with db.session() as s:
-        acme = (await s.execute(text("select id from tenants where slug = 'acme'"))).scalar_one()
+        tenants = {r.slug: r.id for r in await s.execute(text("select slug, id from tenants"))}
+    acme = tenants["acme"]
     sub = str(uuid.uuid4())
 
-    async def override(request: Request) -> TenantCaller:
-        p = Principal(sub=sub, email=None, name="ops", org_id=None, org_alias="acme", roles=frozenset())
-        return TenantCaller(Caller(p, acme, "acme"), acme)
+    async def override(request: Request) -> TenantCaller:  # `x-tenant: bolt` = a Bolt operator
+        slug = request.headers.get("x-tenant", "acme")
+        p = Principal(
+            sub=sub,
+            email=None,
+            name="ops",
+            org_id=None,
+            org_alias=slug,
+            roles=frozenset({"ops_exec", "process_designer"}),
+        )
+        return TenantCaller(Caller(p, tenants[slug], slug), tenants[slug])
 
     app.dependency_overrides[tenant_caller] = override
     client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t/api/v1", timeout=60)
@@ -190,6 +202,12 @@ async def test_ten_seed_bols_route_as_specified(w1: dict[str, Any]) -> None:
     docs = (await c.get("/documents")).json()
     assert len(docs) == 10 and {d["run_status"] for d in docs} >= {"completed", "waiting_human"}
     pdf = await c.get(f"/documents/{docs[0]['id']}/file")
+    # cross-tenant (07 M4): objects live under tenant/<id>/ and Bolt can't reach Acme's document or bytes
+    assert w1["blobs"] and all(k.startswith(f"tenant/{w1['tenant']}/") for k in w1["blobs"])
+    bolt = {"x-tenant": "bolt"}
+    assert (await c.get(f"/documents/{docs[0]['id']}", headers=bolt)).status_code == 404
+    assert (await c.get(f"/documents/{docs[0]['id']}/file", headers=bolt)).status_code == 404
+    assert (await c.get("/documents", headers=bolt)).json() == []
     assert (
         pdf.status_code == 200
         and pdf.content.startswith(b"%PDF")

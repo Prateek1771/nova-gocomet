@@ -17,9 +17,27 @@ from nova_core.settings import get_settings
 from nova_dsl import parse_workflow
 
 DEFINITIONS = Path(os.environ.get("DEFINITIONS_DIR", Path(__file__).resolve().parents[4] / "definitions"))
+# TenantConfig v1 per tenant: same keys, different values (FR-X.2); approval limits from docs/04 W2
 TENANTS = {
-    "acme": ("Acme Logistics", {"ops_lead": 10_000, "finance": 50_000, "controller": None}),
-    "bolt": ("Bolt Freight", {"ops_lead": 5_000, "finance": 25_000, "controller": None}),
+    "acme": (
+        "Acme Logistics",
+        {
+            "approval_limits": {"ops_lead": 10_000, "finance": 50_000, "controller": None},
+            "auto_approve_below": 1000,
+            "bol_min_confidence": 0.85,  # W1: below this, extraction goes to human review
+            "llm_budget_usd": 5.0,  # per-tenant LiteLLM virtual key budget (ADR-028)
+        },
+    ),
+    "bolt": (
+        "Bolt Freight",
+        {
+            "approval_limits": {"ops_lead": 5_000, "finance": 25_000, "controller": None},
+            "auto_approve_below": 500,
+            "bol_min_confidence": 0.95,
+            "dual_control_above": 20_000,  # demo_approval: controller second sign-off
+            "llm_budget_usd": 2.0,
+        },
+    ),
 }
 
 
@@ -80,7 +98,7 @@ async def seed_bookings(c: AsyncConnection, tid: object) -> None:
 async def main() -> None:
     engine = create_async_engine(get_settings().migrations_database_url)
     async with engine.begin() as c:
-        for slug, (name, limits) in TENANTS.items():
+        for slug, (name, settings) in TENANTS.items():
             tid = (
                 await c.execute(
                     text("""
@@ -91,12 +109,7 @@ async def main() -> None:
             ).scalar_one()
             # owner is subject to RLS too (FORCE), so scope the rest to the tenant
             await c.execute(text("select set_config('app.tenant_id', :t, true)"), {"t": str(tid)})
-            config = {
-                "currency": "USD",
-                "approval_limits": limits,
-                "auto_approve_below": 1000,
-                "bol_min_confidence": 0.85,  # W1: below this, extraction goes to human review
-            }
+            config = {"currency": "USD", **settings}
             # only the seed's own v1 is ever rewritten; published versions stay immutable
             await c.execute(
                 text("""

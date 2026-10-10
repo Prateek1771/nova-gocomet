@@ -12,6 +12,7 @@ from temporalio.exceptions import ApplicationError
 from nova_agents import extractor, validator
 from nova_agents.decide import DecideError
 from nova_agents.decide import decide as run_decide
+from nova_agents.llm import BudgetExceeded
 from nova_agents.pipeline import AgentError, book_cost, build
 from nova_core.temporal import AgentRequest
 
@@ -27,6 +28,8 @@ async def run_agent(req: AgentRequest) -> dict[str, Any]:
         state = await graph.ainvoke({"req": asdict(req), "meta": {"cost_usd": 0.0, "calls": []}})
     except AgentError as e:
         raise ApplicationError(str(e), type="AgentError", non_retryable=True) from e
+    except BudgetExceeded as e:  # retrying can't help; a human raises the budget, then retries the step
+        raise ApplicationError(str(e), type="BudgetExceeded", non_retryable=True) from e
     return dict(state["output"])
 
 
@@ -38,6 +41,8 @@ async def decide(req: AgentRequest) -> dict[str, Any]:
         )
     except DecideError as e:
         raise ApplicationError(str(e), type="DecideError", non_retryable=True) from e
+    except BudgetExceeded as e:
+        raise ApplicationError(str(e), type="BudgetExceeded", non_retryable=True) from e
     await book_cost(uuid.UUID(req.tenant_id), req.run_id, out["meta"]["cost_usd"])
     return out
 

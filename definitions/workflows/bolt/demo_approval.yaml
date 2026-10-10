@@ -1,4 +1,5 @@
-# Generic approval: small amounts auto-approve, the rest go to a human with an SLA.
+# Generic approval, Bolt's variant (FR-X.2): small amounts auto-approve, the rest go to a human with an
+# SLA, and amounts at or above `tenant.dual_control_above` also need a controller's second sign-off.
 # Threshold lives in TenantConfig (`tenant.auto_approve_below`), never here (CLAUDE.md rule 2).
 apiVersion: nova/v1
 kind: Workflow
@@ -25,6 +26,20 @@ nodes:
     escalate: {after: 2m, to: {role: finance}}
     outputs: [approved, rejected]
     with: {amount: "${{ input.amount }}"}
+  - id: dual
+    type: rule
+    cases:
+      - when: "double(input.amount) >= double(tenant.dual_control_above)"
+        goto: second
+    default: notify
+  - id: second
+    type: human_task
+    title: "Second sign-off ${{ input.amount }}"
+    assignee: {role: controller}
+    app: generic_review
+    sla: 1h
+    outputs: [approved, rejected]
+    with: {amount: "${{ input.amount }}"}
   - id: notify
     type: action
     action: notify.log
@@ -37,6 +52,8 @@ nodes:
     type: end
     status: rejected
 edges:
-  - {from: review, to: notify, on: approved}
+  - {from: review, to: dual, on: approved}
+  - {from: second, to: notify, on: approved}
+  - {from: second, to: declined, on: rejected}
   - {from: review, to: declined, on: rejected}
   - {from: notify, to: done}

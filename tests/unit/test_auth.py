@@ -82,3 +82,35 @@ def test_wrong_signature(verifier: TokenVerifier) -> None:
 def test_platform_admin_without_org(verifier: TokenVerifier) -> None:
     p = verifier.verify(token(organization=None, resource_access={"nova-api": {"roles": ["platform_admin"]}}))
     assert p.org_alias is None and "platform_admin" in p.roles
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"aud": "account"},
+        {"iss": "http://evil/realms/nova"},
+        {"exp": int(time.time()) - 10},
+        {"organization": None},
+        "tampered",
+    ],
+)
+def test_bad_tokens_are_401_over_http(
+    verifier: TokenVerifier, monkeypatch: pytest.MonkeyPatch, bad: Any
+) -> None:
+    """07 M4: every rejected token is a generic 401 at the API, before any tenant lookup or authz."""
+    from fastapi.testclient import TestClient
+
+    from nova_api import deps
+    from nova_api.main import app
+
+    monkeypatch.setattr(deps, "verifier", lambda: verifier)
+    if bad == "tampered":  # payload edited after signing: the signature no longer matches
+        head, body, sig = token().split(".")
+        claims = json.loads(jwt.utils.base64url_decode(body))
+        claims["resource_access"]["nova-api"]["roles"] = ["tenant_admin"]
+        body = jwt.utils.base64url_encode(json.dumps(claims).encode()).decode()
+        t = f"{head}.{body}.{sig}"
+    else:
+        t = token(**bad)
+    r = TestClient(app).get("/api/v1/me", headers={"Authorization": f"Bearer {t}"})
+    assert r.status_code == 401 and r.json()["error"]["message"] == "invalid token"

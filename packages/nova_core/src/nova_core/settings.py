@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     oidc_audience: str = "nova-api"
     oidc_azp: str = "nova-web"
     openfga_url: str = "http://localhost:8081"
+    openfga_model_path: str = ""  # default: infra/openfga/model.json in the repo
     temporal_host: str = "localhost:7233"
     otel_exporter_otlp_endpoint: str = ""
     # object storage (MinIO / any S3); keys are always tenant/{tenant_id}/...
@@ -27,6 +28,8 @@ class Settings(BaseSettings):
     # LiteLLM proxy (OpenAI-compatible); code only names aliases (CLAUDE.md rule 6)
     llm_base_url: str = "http://localhost:4100"
     llm_api_key: str = "sk-nova-dev"
+    # derives each tenant's LiteLLM virtual key (nova_core.llm_keys); empty = every call uses llm_api_key
+    llm_key_secret: str = ""
     llm_mode: str = "free"  # local | free | cheap | demo (picks the LiteLLM config; free = $0 models)
     # decisions-model id for the gateway's /jev/decisions pass-through; config, not code (rule 6)
     jev_model: str = ""

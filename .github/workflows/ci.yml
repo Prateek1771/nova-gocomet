@@ -88,8 +88,15 @@ jobs:
         with: { enable-cache: true }
       - run: uv sync --frozen
       - name: OpenFGA model validates
-        run: docker run --rm -v "$PWD/infra/openfga:/m:ro" openfga/cli model validate --file /m/model.fga | tee /dev/stderr | grep -q '"is_valid":true'
-      # testcontainers Postgres (RLS, engine + API on Temporal's test server) + Keycloak (realm, tokens)
+        run: docker run --rm -v "$PWD/infra/openfga:/m:ro" openfga/cli:v0.7.3 model validate --file /m/model.fga | tee /dev/stderr | grep -q '"is_valid":true'
+      - name: OpenFGA model.json matches model.fga (make gen)
+        run: |
+          docker run --rm -v "$PWD/infra/openfga:/m:ro" openfga/cli:v0.7.3 model transform --file /m/model.fga > /tmp/model.json
+          python3 -c "import json,sys; sys.exit(json.load(open('/tmp/model.json')) != json.load(open('infra/openfga/model.json')))"
+      - name: Staging realm is generated from the dev realm
+        run: uv run python scripts/staging_realm.py && git diff --exit-code infra/keycloak-staging
+      # testcontainers Postgres (RLS, engine + API on Temporal's test server), OpenFGA (RBAC matrix) and
+      # Keycloak (dev realm tokens, staging MFA realm)
       - run: uv run pytest tests/integration --junitxml=junit-int.xml
       - uses: actions/upload-artifact@v4
         if: always()

@@ -212,8 +212,8 @@ changes (paths-filter)
 - [ ] Keycloak 26.x in `core` on its own Postgres DB; healthcheck.
 - [ ] `infra/keycloak/realm-nova.json`: realm `nova`, clients `nova-web` / `nova-api` / `nova-admin`, 9 client roles, Organizations Acme + Bolt with the org claim mapper, dev users (one per role per tenant).
 - [ ] Token policy: access 5 min, refresh rotation, SSO idle 30 min; brute-force detection; password policy.
-- [ ] MFA (OTP/WebAuthn) required for `platform_admin`, `tenant_admin`, `finance`, `controller` in the staging realm.
-- [ ] Login + admin events enabled.
+- [x] MFA (OTP) required for `platform_admin`, `tenant_admin`, `finance`, `controller` in the staging realm (`scripts/staging_realm.py`, M4; WebAuthn later).
+- [x] Login + admin events enabled (explicit event types in staging).
 - [ ] Next.js BFF: `openid-client` PKCE login, callback (state + nonce), RP-initiated logout; Redis session; httpOnly `SameSite=Lax` cookie; `proxy.ts` guard.
 - [ ] `/api/v1/[...path]` proxy: refresh when < 60 s remain, attach bearer, stream SSE, Origin check on mutations.
 - [ ] FastAPI: JWKS validation (`iss`, `aud`, `exp`, `azp`), principal, org → `tenant_id`, `users` mirror upsert, `GET /me`.
@@ -222,22 +222,22 @@ changes (paths-filter)
 - [ ] `tenant_id` on every table, key, topic message and object prefix.
 - [ ] Postgres RLS with `nova_app` as a non-owner; tenant set per transaction.
 - [ ] MinIO `tenant/{id}/` prefixes; Weaviate tenant per Nova tenant; ClickHouse row policies (M6).
-- [ ] LiteLLM virtual key per tenant (M4).
+- [x] LiteLLM virtual key per tenant (M4, derived per ADR-028).
 
 ### Authorization: RBAC + ReBAC in OpenFGA (M4)
-- [ ] Model from [LLD §7](03-lld.md#7-authorization-openfga): roles on `tenant`, capability relations, `workflow` / `run` / `task`, `within_limit`.
-- [ ] Roles from the token sent as contextual tuples on every Check/ListObjects; no role tuples stored.
-- [ ] `require(capability, object)` FastAPI dependency on every route (capability table in LLD §8).
-- [ ] Engine writes ownership, assignee and approver tuples; approver `limit` from `TenantConfig.approval_limits` of the pinned config version.
-- [ ] Inbox via `ListObjects`; task completion via `can_complete` with `{amount}`.
-- [ ] UI hides nav/actions by role (cosmetic only).
+- [x] Model from [LLD §7](03-lld.md#7-authorization-openfga): roles on `tenant`, capability relations, `workflow` / `run` / `task`, `within_limit`.
+- [x] Roles from the token sent as contextual tuples on every check; no role tuples stored.
+- [x] `authorize(capability, object)` on every route (capability table in LLD §8).
+- [x] Ownership, assignee and approver facts with `limit` from `TenantConfig.approval_limits` of the pinned config version. Sent as contextual tuples per check instead of written by the engine (ADR-026).
+- [x] Inbox = open rows batch-checked for `can_claim` (ADR-026); task completion via `can_complete` with `{amount}`.
+- [x] UI hides nav by capability from `/me` (cosmetic only).
 
 ### Tests
-- [ ] Token: expired, wrong `aud`/`iss`/`azp`, bad signature, missing org → 401; refresh and logout flows; no token visible to browser JS (E2E check).
-- [ ] RBAC matrix: every role × capability against the allow/deny table; `platform_admin` gets 403 on tenant data.
+- [x] Token: expired, wrong `aud`/`iss`/`azp`, bad signature, missing org → 401 (verifier + HTTP); logout and no-token-in-browser verified live (M0).
+- [x] RBAC matrix: every role × capability against the allow/deny table; `platform_admin` gets 403 on tenant data (`test_rbac.py`).
 - [ ] Role removed in Keycloak → access denied after the next refresh (≤ 5 min).
-- [ ] Cross-tenant suite on every store.
-- [ ] IDOR tests (ID swapping across tenants).
+- [x] Cross-tenant suite on every store present so far (Postgres, MinIO, FGA; Weaviate and ClickHouse when they land).
+- [x] IDOR tests (ID swapping across tenants → 404: runs, tasks, documents, files).
 - [ ] Approval-limit bypass via direct API call → 403.
 
 ### Exit criteria
@@ -431,7 +431,7 @@ changes (paths-filter)
 ### Audit
 - [ ] Entries for login, upload, publish (with diff), run start/end, every step, every human decision, every action, config change, budget stop.
 - [ ] Actor type (user/agent/system), evidence, `definition_version`, `config_version`, request/trace ID.
-- [ ] Append-only + hash chain; verification job.
+- [x] Append-only + hash chain; verification job (ADR-027, `make audit-verify`).
 
 ### Privacy
 - [ ] PII-tagged columns drive redaction in logs, traces and prompts.

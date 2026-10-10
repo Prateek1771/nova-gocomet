@@ -1,6 +1,77 @@
 {
   "components": {
     "schemas": {
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "actor_type": {
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "config_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Version"
+          },
+          "definition_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Version"
+          },
+          "evidence": {
+            "title": "Evidence"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "actor_type",
+          "actor_id",
+          "action",
+          "subject",
+          "evidence",
+          "definition_version",
+          "config_version",
+          "hash"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
       "Body_upload_api_v1_documents_post": {
         "properties": {
           "doc_type": {
@@ -18,6 +89,53 @@
           "file"
         ],
         "title": "Body_upload_api_v1_documents_post",
+        "type": "object"
+      },
+      "Budget": {
+        "properties": {
+          "max_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Budget"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          },
+          "provisioned": {
+            "title": "Provisioned",
+            "type": "boolean"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "provisioned",
+          "max_budget",
+          "spend",
+          "period",
+          "resets_at"
+        ],
+        "title": "Budget",
         "type": "object"
       },
       "CompleteIn": {
@@ -614,6 +732,17 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
           }
         },
         "required": [
@@ -928,6 +1057,33 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "Verification": {
+        "properties": {
+          "broken": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Broken",
+            "type": "array"
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "entries",
+          "broken"
+        ],
+        "title": "Verification",
+        "type": "object"
+      },
       "Version": {
         "properties": {
           "key": {
@@ -1073,6 +1229,32 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/llm-budget": {
+      "get": {
+        "operationId": "llm_budget_api_v1_admin_llm_budget_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Budget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Llm Budget",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/apps/{key}": {
       "get": {
         "operationId": "get_app_api_v1_apps__key__get",
@@ -1119,6 +1301,121 @@
         "summary": "Get App",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "list_audit_api_v1_audit_get",
+        "parameters": [
+          {
+            "description": "seq to page back from",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "seq to page back from",
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "prefix, e.g. task:<id> or run:<id>",
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "prefix, e.g. task:<id> or run:<id>",
+              "title": "Subject"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "title": "Response List Audit Api V1 Audit Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Audit",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/audit/verify": {
+      "get": {
+        "operationId": "verify_api_v1_audit_verify_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verify",
+        "tags": [
+          "audit"
         ]
       }
     },
@@ -1724,7 +2021,7 @@
     },
     "/api/v1/tasks": {
       "get": {
-        "description": "Open work by default. `mine=true`: tasks I've claimed.\nponytail: role-based inbox (OpenFGA ListObjects can_view) arrives in M4; until then every open task\nin the tenant is listed.",
+        "description": "Open work the caller can act on (OpenFGA `can_claim`: their role is the assignee, or an approver\nwithin its limit). `mine=true`: tasks I've claimed. `status=done` lists finished work they could see.",
         "operationId": "inbox_api_v1_tasks_get",
         "parameters": [
           {

@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </span>
           <span className="text-lg font-semibold tracking-tight">Nova</span>
         </div>
-        <Nav openTasks={openTasks} />
+        <Nav openTasks={openTasks} caps={me.capabilities ?? []} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
