@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     llm_mode: str = "free"  # local | free | openai | cheap | demo (the LiteLLM config; free = $0 models)
     # decisions-model id for the gateway's /jev/decisions pass-through; config, not code (rule 6)
     jev_model: str = ""
+    # data layer (M6, ADR-035): analysts read ClickHouse as nova_reader with SQL_tenant_id per query
+    kafka_bootstrap: str = "localhost:9094"
+    clickhouse_url: str = "http://localhost:8124"
+    clickhouse_reader: str = "nova_reader"
+    clickhouse_reader_password: str = "nova_reader"  # noqa: S105 (dev default; env overrides)
+    kafka_lag_alert: int = 1000  # messages behind, sustained 60 s -> KAFKA_LAG_ALERT
     max_upload_mb: int = 20
     max_pages: int = 20
     log_level: str = "INFO"

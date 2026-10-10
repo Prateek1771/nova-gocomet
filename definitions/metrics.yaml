@@ -1,0 +1,47 @@
+# Governed metrics (FR-4.2, ADR-035): the only ClickHouse reads agents, rules and the API may make. Each is a
+# dbt view in nova_metrics (infra/dbt/models). `value` is the number exception rules compare; `columns` is
+# what query_metric returns; `order` sorts it. Reads run as nova_reader under the tenant's row policy.
+# A new exception type = a metric here + a rule in TenantConfig `exceptions.rules` + SOPs (docs/09).
+metrics:
+  eta_slip_hours:
+    description: Latest carrier ETA minus the first ETA seen, per shipment (hours).
+    grain: shipment
+    value: slip_hours
+    columns: [shipment_id, container_no, eta_planned, eta_current, slip_hours, as_of]
+    order: slip_hours desc
+  dwell_time_hours:
+    description: Hours at a transhipment port, discharged -> loaded (or until now if still waiting).
+    grain: shipment x location
+    value: dwell_hours
+    columns: [shipment_id, container_no, location, discharged_at, loaded_at, dwell_hours]
+    order: dwell_hours desc
+  missed_transhipment:
+    description: 1 when the connecting vessel left a transhipment port without the container.
+    grain: shipment x location
+    value: missed
+    columns: [shipment_id, container_no, location, departed_vessel, departed_at, missed]
+    order: departed_at desc
+  rollover:
+    description: Times the booking moved to another vessel.
+    grain: shipment
+    value: rollovers
+    columns: [shipment_id, container_no, booked_first, booked_now, rollovers, rolled_at]
+    order: rolled_at desc
+  touchless_rate:
+    description: Share of finished runs that needed no human task, per day.
+    grain: day
+    value: touchless_rate
+    columns: [day, runs, touchless, touchless_rate]
+    order: day
+  cost_per_run:
+    description: LLM spend per finished run, per day (USD).
+    grain: day
+    value: cost_per_run
+    columns: [day, runs, spend_usd, cost_per_run]
+    order: day
+  invoice_variance_pct:
+    description: Invoice total vs contract, per W2 run (%).
+    grain: run
+    value: variance_pct
+    columns: [run_id, variance_pct, total_usd, ended_at]
+    order: ended_at desc

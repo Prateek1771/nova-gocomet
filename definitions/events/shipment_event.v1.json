@@ -1,0 +1,23 @@
+{
+  "$id": "nova/events/shipment_event.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shipment event (Kafka topic shipment.events, key tenant_id:shipment_id)",
+  "description": "One carrier/terminal milestone for a container on a booking. Producer: the simulator (any feed in production). Consumers: ClickHouse (Kafka engine -> shipment_events). Times are ISO-8601 UTC; in the simulator they run on sim time (1 sim-day = 1 real minute).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "tenant_id", "shipment_id", "container_no", "event_type", "location", "port_role", "event_time"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid", "description": "Unique per event; replays keep it, so consumers dedupe on it."},
+    "tenant_id": {"type": "string", "format": "uuid"},
+    "shipment_id": {"type": "string", "format": "uuid"},
+    "container_no": {"type": "string", "pattern": "^[A-Z]{4}[0-9]{7}$"},
+    "event_type": {"enum": ["gate_in", "loaded", "departed", "arrived", "eta_update", "discharged"]},
+    "location": {"type": "string", "pattern": "^[A-Z]{5}$", "description": "UN/LOCODE"},
+    "port_role": {"enum": ["pol", "ts", "pod"], "description": "Where on the route the location sits: loading, transhipment or discharge port."},
+    "vessel": {"type": ["string", "null"], "description": "Vessel the container moves on (loaded/departed/arrived)."},
+    "voyage": {"type": ["string", "null"]},
+    "booked_vessel": {"type": ["string", "null"], "description": "Vessel on the booking when the event was sent; a change is a rollover."},
+    "event_time": {"type": "string", "format": "date-time"},
+    "eta": {"type": ["string", "null"], "format": "date-time", "description": "Carrier ETA at the port of discharge as of this event."}
+  }
+}

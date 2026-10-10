@@ -1,14 +1,20 @@
 # Same commands locally and in CI (docs/10 Phase 2). Windows: `winget install ezwinports.make`, or run the
 # lines below directly.
-COMPOSE = docker compose -f infra/docker-compose.yml --profile core
+COMPOSE = docker compose -f infra/docker-compose.yml --env-file .env --profile core
 
-.PHONY: up up-full down logs seed test test-int lint fmt gen ci bols invoices reindex bench-llm redteam audit-verify
+.PHONY: up up-data up-full sim down logs seed test test-int lint fmt gen ci bols invoices reindex bench-llm redteam audit-verify
 
 up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
 
-up-full:       ## core + ai profile (Langfuse on :3400, collector also exports to it)
-	OTEL_COLLECTOR_CONFIG=collector.ai.yaml LANGFUSE_URL=http://localhost:3400 $(COMPOSE) --profile ai up -d --build
+up-data:       ## core + data profile (W3: Kafka, Debezium, ClickHouse, dbt views, trigger router, simulator)
+	$(COMPOSE) --profile data up -d --build
+
+up-full:       ## core + data + ai (Langfuse on :3400, collector also exports to it)
+	OTEL_COLLECTOR_CONFIG=collector.ai.yaml LANGFUSE_URL=http://localhost:3400 $(COMPOSE) --profile data --profile ai up -d --build
+
+sim:           ## replay the W3 shipment scenario from sim-day 0 (clears shipment events, resolves open exceptions)
+	$(COMPOSE) --profile data run --rm simulator python -m nova_ingest.simulator --reset
 
 down:
 	$(COMPOSE) --profile ai --profile data down

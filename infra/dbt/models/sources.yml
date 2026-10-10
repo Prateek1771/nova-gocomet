@@ -1,0 +1,11 @@
+version: 2
+sources:
+  - name: nova
+    schema: nova
+    tables:
+      - name: shipment_events
+        description: Carrier/terminal milestones from shipment.events (Kafka engine + MV), one row per event_id.
+      - name: step_facts
+        description: Postgres run_steps via Debezium CDC.
+      - name: run_facts
+        description: Postgres workflow_runs via Debezium CDC.

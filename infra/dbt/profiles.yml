@@ -1,0 +1,11 @@
+nova:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      driver: http
+      host: clickhouse
+      port: 8123
+      user: nova
+      password: nova
+      schema: nova_metrics

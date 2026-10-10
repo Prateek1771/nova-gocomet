@@ -139,9 +139,9 @@ async def carrier_dispute_email(params: dict[str, Any], ctx: ActionRequest) -> d
     async with db.tenant_session(uuid.UUID(ctx.tenant_id)) as s:
         mid = (
             await s.execute(
-                text("""insert into outbox (tenant_id, aggregate, type, payload)
-                        values (:t, :a, 'email.dispute', cast(:p as jsonb)) returning id"""),
-                {"t": ctx.tenant_id, "a": f"invoice:{f.get('invoice_no')}", "p": json.dumps(payload)},
+                text("""insert into outbox (tenant_id, aggregate, aggregate_id, type, payload)
+                        values (:t, 'invoice', :a, 'email.dispute', cast(:p as jsonb)) returning id"""),
+                {"t": ctx.tenant_id, "a": str(f.get("invoice_no")), "p": json.dumps(payload)},
             )
         ).scalar_one()
     return {

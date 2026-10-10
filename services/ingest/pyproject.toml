@@ -1,0 +1,14 @@
+[project]
+name = "nova-ingest"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+  "nova-core", "temporalio>=1.9", "aiokafka>=0.12", "jsonschema>=4.23", "pyyaml>=6",
+]
+
+[tool.uv.sources]
+nova-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,15 @@
+{
+  "$id": "nova/events/outbox_event.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Outbox event (Kafka topics nova.outbox.<aggregate>, key aggregate_id)",
+  "description": "Debezium's outbox EventRouter publishes outbox.payload as the record value, with id, tenant_id and type as headers. Every side-effect notification is one of these (CLAUDE.md rule 8: written by an idempotent action in the same transaction). Consumer: the ingest notifier (mock sink).",
+  "type": "object",
+  "required": ["to", "subject", "body"],
+  "properties": {
+    "to": {"type": "string", "minLength": 1},
+    "subject": {"type": "string", "minLength": 1},
+    "body": {"type": "string"},
+    "run_id": {"type": ["string", "null"]},
+    "refs": {"type": "object", "description": "Ids the message is about, e.g. {exception_id, shipment_id} or {invoice_no}."}
+  }
+}

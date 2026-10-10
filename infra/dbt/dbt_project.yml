@@ -1,0 +1,10 @@
+# Governed metrics for Nova (M6, ADR-035): plain dbt-clickhouse models materialised as views in
+# nova_metrics, so they are always current and nothing has to refresh them before a detection cycle.
+# definitions/metrics.yaml is the registry agents and the API query through (never raw tables, FR-4.2).
+name: nova
+version: "1.0"
+profile: nova
+model-paths: ["models"]
+models:
+  nova:
+    +materialized: view

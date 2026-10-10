@@ -15,6 +15,8 @@ x-api-env: &api-env
   LLM_BASE_URL: http://litellm:4000
   OPENFGA_URL: http://openfga:8080
   WEAVIATE_URL: http://weaviate:8080
+  CLICKHOUSE_URL: http://clickhouse:8123  # data profile (M6); analysts read as nova_reader
+  KAFKA_BOOTSTRAP: kafka:9092
   LLM_KEY_SECRET: nova-dev-llm-key-secret  # derives each tenant's LiteLLM virtual key (ADR-028)
   ENV: dev
 
@@ -235,16 +237,18 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094  # host: tests, scripts
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_NUM_PARTITIONS: 6
       KAFKA_HEAP_OPTS: -Xmx512m -Xms256m
+    ports: ["127.0.0.1:9094:9094"]
+    volumes: ["kafkadata:/var/lib/kafka/data"]
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 10s
@@ -271,13 +275,68 @@ services:
     environment:
       CLICKHOUSE_USER: nova
       CLICKHOUSE_PASSWORD: nova
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1  # nova may create the reader user and row policies
     ports: ["127.0.0.1:8124:8123"]  # 8123 is often taken (Langfuse ClickHouse)
     volumes:
       - chdata:/var/lib/clickhouse
+      - ./clickhouse:/nova-init:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--user", "nova", "--password", "nova", "-q", "select 1"]
       interval: 10s
       retries: 20
+
+  clickhouse-init:
+    # idempotent DDL, users and row policies (the volume is shared with Langfuse: first-boot init never runs)
+    image: clickhouse/clickhouse-server:25.8
+    profiles: [data]
+    entrypoint: ["clickhouse-client", "--host", "clickhouse", "--user", "nova", "--password", "nova",
+                 "--multiquery", "--queries-file", "/nova-init/01-nova.sql"]
+    volumes: ["./clickhouse:/nova-init:ro"]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  connect-init:
+    # CDC role + publication, then the nova-cdc connector (idempotent PUT); see infra/kafka-connect/register.py
+    image: nova-api:dev
+    profiles: [data]
+    command: ["python", "/kc/register.py"]
+    volumes: ["./kafka-connect:/kc:ro"]
+    depends_on:
+      connect: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+
+  dbt:
+    # one-shot: (re)creates the metric views in nova_metrics (views, so they are always current; ADR-035)
+    build: { context: ./dbt }
+    image: nova-dbt:dev
+    profiles: [data]
+    command: ["dbt", "run", "--profiles-dir", ".", "--project-dir", "."]
+    depends_on:
+      clickhouse-init: { condition: service_completed_successfully }
+
+  ingest:
+    # Kafka -> workflow trigger router + outbox notifier (mock sink) + consumer-lag readings
+    image: nova-ingest:dev
+    build: { context: .., dockerfile: services/ingest/Dockerfile }
+    profiles: [data]
+    environment: *api-env
+    restart: unless-stopped
+    depends_on:
+      kafka: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+
+  simulator:
+    # plays definitions/seed/shipments.json onto shipment.events: 1 sim-day = 1 real minute; `make sim` replays
+    image: nova-ingest:dev
+    profiles: [data]
+    command: ["python", "-m", "nova_ingest.simulator"]
+    environment: *api-env
+    depends_on:
+      kafka: { condition: service_healthy }
+      clickhouse-init: { condition: service_completed_successfully }
+      migrate: { condition: service_completed_successfully }
 
   # --- ai profile (M4): Langfuse v3 for LLM traces, on the shared Postgres, ClickHouse, Redis and MinIO.
   # Run with: make up-full  (= --profile core --profile ai, collector.ai.yaml). UI: http://localhost:3400
@@ -360,3 +419,4 @@ volumes:
   pgdata:
   temporaldata:
   chdata:
+  kafkadata:
