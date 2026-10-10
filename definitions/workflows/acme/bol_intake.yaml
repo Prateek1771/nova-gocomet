@@ -35,8 +35,12 @@ nodes:
           "true": >-
             At least one issue makes the declared data wrong, inconsistent or unverifiable for customs:
             an invalid container number, an unknown port code, a mismatch with the booking (consignee,
-            port, container count), a weight total that doesn't add up, or an unreadable document.
-          "false": "There are no issues, or only cosmetic ones that don't change any declared value."
+            port of loading or discharge, container count), a weight total that doesn't add up, goods whose
+            description contradicts their HS code, dates in an impossible order, or an unreadable document.
+            Any issue of medium or high severity counts.
+          "false": >-
+            There are no issues, or only cosmetic formatting ones (letter case, spacing, punctuation,
+            a missing prefix) that don't change any declared value.
         # a missed blocker costs a customs hold; a needless review costs minutes, so lean to review
         threshold: 0.4
     timeout: 60s

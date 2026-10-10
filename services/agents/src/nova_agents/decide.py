@@ -59,7 +59,7 @@ async def _jev(
     ask: list[dict[str, Any]], calls: list[dict[str, Any]], tenant_id: str | None = None
 ) -> tuple[dict[str, float], float] | None:
     s = get_settings()
-    if not s.jev_model or s.llm_mode in {"local", "free"}:  # Jev is paid
+    if not s.jev_model or s.llm_mode not in {"cheap", "demo"}:  # Jev: only the paid OpenRouter configs
         return None
     body = {
         "model": s.jev_model,

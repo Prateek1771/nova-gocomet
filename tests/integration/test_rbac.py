@@ -130,3 +130,20 @@ async def test_dual_control_task_stays_with_controller() -> None:
     obj, facts, ctx = _task("controller", 22000)
     assert await can("controller", "can_complete", obj, facts, ctx)
     assert not await can("finance", "can_complete", obj, facts, ctx)  # 22000 is within finance's limit
+
+
+# 07 M5: approval-limit matrix for W2 review tasks (assigned to ops_lead, carrying `amount`), every role
+# × amount band, on Acme's limits (ops_lead 10,000 · finance 50,000 · controller unlimited).
+BANDS = {
+    555: {"ops_lead", "finance", "controller"},  # ≤ auto limit (only reaches a human if flagged)
+    6345: {"ops_lead", "finance", "controller"},  # L0–L2
+    12615: {"finance", "controller"},  # above L2 / the ops lead's limit
+    60000: {"controller"},  # above finance
+}
+
+
+@pytest.mark.parametrize("amount", sorted(BANDS))
+async def test_w2_approval_matrix(amount: int) -> None:
+    obj, facts, ctx = _task("ops_lead", amount)
+    for role in ROLES:
+        assert await can(role, "can_complete", obj, facts, ctx) == (role in BANDS[amount]), (role, amount)

@@ -2,6 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "bol_v1",
   "title": "Bill of Lading v1 (docs/04 W1)",
+  "x-nova-prompt": "Ports as 5-letter UN/LOCODE (when both a name and a code are printed, use the code). Weights in kg as numbers. Container numbers without spaces. Copy names and addresses as printed, joined with \", \". freight_terms is \"prepaid\" or \"collect\". cargo_lines has one entry per row of the cargo table.",
+  "x-nova-evidence": {"skip": ["notify_party"], "lines": {"cargo_lines": ["weight_kg"]}},
   "type": "object",
   "additionalProperties": false,
   "required": ["bol_number", "shipper", "consignee", "pol", "pod", "container_numbers", "gross_weight_kg"],

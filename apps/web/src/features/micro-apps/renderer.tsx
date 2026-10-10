@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 
 import type { LayoutNode } from "@/lib/types";
 
+import { ComparisonTable } from "./comparison-table";
 import { useTaskApp } from "./context";
 import { DecisionBar } from "./decision-bar";
 import { DocumentViewer } from "./document-viewer";
@@ -13,7 +14,7 @@ import { PayloadView } from "./payload-view";
 
 // The component registry (FR-3.2). A micro-app definition can only name what's here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REGISTRY: Record<string, ComponentType<any>> = { DocumentViewer, IssueList, FieldForm, DecisionBar, PayloadView };
+const REGISTRY: Record<string, ComponentType<any>> = { DocumentViewer, IssueList, FieldForm, ComparisonTable, DecisionBar, PayloadView };
 
 /** `$.a.b` over the task's run-context snapshot (LLD §9). ponytail: dotted paths only, no filters. */
 export function resolve(path: string, root: unknown): unknown {

@@ -1,0 +1,34 @@
+# Bolt's L3 invoice approval (docs/04 W2): one controller sign-off, run as a subflow of invoice_match.
+# The parent continues to payment only when this run completes; a rejection ends it as rejected.
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: controller_signoff
+  title: Controller sign-off (L3)
+trigger: {type: manual}
+inputs:
+  amount: {type: number}
+  invoice_no: {type: string}
+  carrier_scac: {type: string}
+  variance_pct: {type: number}
+nodes:
+  - id: signoff
+    type: human_task
+    title: "L3 · controller sign-off · invoice ${{ input.invoice_no }} · ${{ int(input.amount) }} USD"
+    assignee: {role: controller}
+    app: generic_review
+    sla: 24h
+    outputs: [approved, rejected]
+    with:
+      amount: "${{ input.amount }}"
+      invoice_no: "${{ input.invoice_no }}"
+      carrier_scac: "${{ input.carrier_scac }}"
+      variance_pct: "${{ input.variance_pct }}"
+  - id: done
+    type: end
+  - id: rejected
+    type: end
+    status: rejected
+edges:
+  - {from: signoff, to: done, on: approved}
+  - {from: signoff, to: rejected, on: rejected}

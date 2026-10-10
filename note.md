@@ -13,7 +13,7 @@ from day one. If you want a role where you build and think and ship — not just
 — keep reading.
 
 ## What you’ll actually do
-- Build real things. You’ll write production code across the full stack — React frontends,
+- Build real things. You’ll write production code across the full stack — React frontends,ru
 Python/Node backends, ClickHouse queries, Kafka event pipelines, LangGraph agent
 workflows, and YAML-driven process definitions. Not prototypes. Not demos. Stuff that runs in
 production for real companies moving real cargo across real oceans.

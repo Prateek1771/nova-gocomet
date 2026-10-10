@@ -14,6 +14,7 @@ x-api-env: &api-env
   S3_ENDPOINT: minio:9000
   LLM_BASE_URL: http://litellm:4000
   OPENFGA_URL: http://openfga:8080
+  WEAVIATE_URL: http://weaviate:8080
   LLM_KEY_SECRET: nova-dev-llm-key-secret  # derives each tenant's LiteLLM virtual key (ADR-028)
   ENV: dev
 
@@ -119,6 +120,7 @@ services:
         required: false
     environment:
       LITELLM_MASTER_KEY: sk-nova-dev
+      LLM_MODE: ${LLM_MODE:-free}  # shell overrides .env, so `LLM_MODE=openai docker compose up` switches per run
       UI_USERNAME: admin          # dev-only admin UI login at http://localhost:4100/ui
       UI_PASSWORD: nova-dev-admin
     volumes: ["./litellm:/configs:ro"]
@@ -142,6 +144,23 @@ services:
       interval: 5s
       retries: 20
 
+  weaviate:
+    # contract-clause search (ADR-030): native multi-tenancy, vectors we bring from nova-embed
+    image: semitechnologies/weaviate:1.32.5
+    profiles: [core]
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"  # dev: only reachable inside the compose network + localhost
+      DEFAULT_VECTORIZER_MODULE: none
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      CLUSTER_HOSTNAME: node1
+      DISABLE_TELEMETRY: "true"
+    ports: ["127.0.0.1:8090:8080"]
+    volumes: [weaviatedata:/var/lib/weaviate]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 5s
+      retries: 30
+
   migrate:
     image: nova-api:dev
     build: { context: .., dockerfile: services/api/Dockerfile }
@@ -162,6 +181,7 @@ services:
       temporal: { condition: service_healthy }
       minio: { condition: service_started }
       openfga: { condition: service_healthy }
+      weaviate: { condition: service_healthy }
 
   engine:
     image: nova-engine:dev
@@ -335,6 +355,7 @@ services:
       redis: { condition: service_healthy }
 
 volumes:
+  weaviatedata:
   miniodata:
   pgdata:
   temporaldata:

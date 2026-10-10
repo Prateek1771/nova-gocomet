@@ -221,7 +221,8 @@ A single Temporal activity `run_agent(agent_key, input, run_meta)` looks up the 
 |---|---|---|---|
 | `doc_extractor` | extract | `pdfplumber` text layer + word bboxes → `nova-extract-text`; `nova-extract-vision` only for pages without text; `Extractor` adapter (DPT-2 optional); schema registry | `fields{}`, per-field `confidence`, `evidence[{page,bbox,text}]` |
 | `bol_validator` | reason | deterministic checks first (ISO 6346 check digit, UN/LOCODE lookup, dates, weights sum) → LLM for cross-doc semantics vs booking | `issues[{code,field,severity,evidence}]` |
-| `invoice_matcher` | reason | PO lines, rate contract (PageIndex / Weaviate clause search), FX table | `matches[]`, `variance_pct`, `cited_clauses[]` |
+| `invoice_dedupe` | — (no model) | earlier extractions with the same carrier + invoice number | `duplicate`, `prior_document_id` |
+| `invoice_matcher` | reason | PO lines, rate contract (Weaviate hybrid clause search; the model picks, code verifies the citation), FX table, container events | `matches[]`, `total_usd`, `variance_pct`, `issues[]`, `max_severity`, `cited_clauses[]`, `accessorials[]` |
 | `exception_analyst` | reason | `query_metric` tool (dbt semantic layer → ClickHouse SQL, read-only, tenant row policy) | `severity`, `facts[{sql,rows}]` |
 | `action_recommender` | reason | Weaviate SOP search, carrier playbook | `recommendations[{action,why,sop_ref}]` |
 
@@ -286,10 +287,16 @@ human_tasks(id, tenant_id, run_id, node_id, title, app_key, assignee_role, assig
 documents(id, tenant_id, doc_type, storage_key, sha256, pages int, uploaded_by,
           unique(tenant_id, sha256))
 extractions(id, tenant_id, document_id, schema_key, fields jsonb, confidence jsonb, evidence jsonb, model)
--- master data (seeded)
-carriers, ports, bookings, purchase_orders, po_lines, rate_contracts, contract_clauses,
+-- master data (seeded; W2 tables from migration 0005, ADR-031/032)
+carriers, ports, bookings(booking_ref, container_count, pod, consignee, booking_date),
+purchase_orders(po_number, carrier_scac, currency, bol_number) · po_lines(po_id, charge_code, qty, unit_rate)
+rate_contracts(contract_no, carrier_scac, currency, free_time_days, valid_from, valid_to)
+contract_clauses(contract_id, clause_id, charge_code, title, text, rate, unit)   -- also in Weaviate (ADR-030)
+container_events(container_no, event_type{gate_out,gate_in,…}, location, event_time)  -- dwell facts until M6
+fx_rates(currency, usd_rate, as_of)
 shipments(id, tenant_id, container_no, carrier_id, pol, pod, etd, eta_planned, eta_current, status)
-invoices(id, tenant_id, document_id, carrier_id, invoice_no, currency, total, lines jsonb)
+invoices(id, tenant_id, document_id, carrier_scac, invoice_no, currency, total, lines jsonb,
+         status{received,posted}, run_id, posted_at, unique(tenant_id, carrier_scac, invoice_no))
 exceptions(id, tenant_id, shipment_id, type, severity, detected_at, status, facts jsonb,
            unique(tenant_id, shipment_id, type) where status='open')
 micro_apps(id, tenant_id, key, version, definition jsonb)
@@ -568,3 +575,12 @@ Bindings are JSONPath over the task's run-context snapshot. The renderer is a ~1
 - Interpreter: Temporal `WorkflowEnvironment` time-skipping tests, with activities mocked. Covers branching, SLA escalation, signals, `continue_as_new`.
 - Agents: deterministic checks unit-tested. LLM paths use recorded responses (VCR) + a small Langfuse eval dataset built from the synthetic seed (planted errors = labels).
 - E2E: Playwright demo script: upload → inbox → approve → run completes.
+
+## W2 action contracts (M5, ADR-032)
+
+| Action | Params | Effect | Returns |
+|---|---|---|---|
+| `erp.post_payable` | `fields` (invoice_v1), `document_id`, `amount_usd` | upsert `invoices` with status `posted` (once per carrier + invoice number) | `payable_id`, `invoice_no`, `amount_usd` |
+| `carrier.dispute_email` | `fields`, `issues[]` (matcher findings), `clauses[]` (cited), `reason` | `outbox` row of type `email.dispute`; the body quotes each disputed line's clause text and the reviewer's reason | `message_id`, `subject`, `body`, `clause_ids` |
+
+Both run through `action_executions` like every action, so a replay returns the cached result.

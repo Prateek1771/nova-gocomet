@@ -1,0 +1,88 @@
+{
+  "_doc": "W2 seed (docs/04 W2): rate contracts with citable clauses, POs, container events (dwell facts until M6 moves them to ClickHouse), FX, and 8 invoices with planted errors. Seeded identically for every tenant; the expected branch differs per tenant because the approval matrix lives in TenantConfig. Upload order matters for the duplicate (INV-5 reuses INV-1's number).",
+  "fx": {"USD": 1.0, "EUR": 1.08, "GBP": 1.27},
+  "contracts": [
+    {
+      "contract_no": "MAEU-RC-2026",
+      "carrier_scac": "MAEU",
+      "currency": "USD",
+      "free_time_days": 5,
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "clauses": [
+        {"clause_id": "MAEU-RC-2026 §3.1", "charge_code": "OFR", "title": "Ocean freight, Shanghai–Rotterdam", "rate": 1850, "unit": "per 40' container", "text": "Ocean freight from Shanghai (CNSHA) to Rotterdam (NLRTM) is USD 1,850 per 40' container, all-in except terminal handling. Rates are fixed for the contract term; no general rate increase applies before 31 December 2026."},
+        {"clause_id": "MAEU-RC-2026 §3.4", "charge_code": "THC", "title": "Terminal handling at destination", "rate": 240, "unit": "per container", "text": "Destination terminal handling is charged at USD 240 per container, once per container per move."},
+        {"clause_id": "MAEU-RC-2026 §5.2", "charge_code": "DOC", "title": "Documentation fee", "rate": 75, "unit": "per bill of lading", "text": "A documentation fee of USD 75 applies per bill of lading issued."},
+        {"clause_id": "MAEU-RC-2026 §7.1", "charge_code": "DET", "title": "Detention", "rate": 95, "unit": "per container per day", "text": "Merchant haulage detention: 5 free days from gate-out of the full container to gate-in of the empty container. Each further day is charged at USD 95 per container per day. Days within free time are not chargeable."}
+      ]
+    },
+    {
+      "contract_no": "HLCU-RC-2026",
+      "carrier_scac": "HLCU",
+      "currency": "USD",
+      "free_time_days": 7,
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "clauses": [
+        {"clause_id": "HLCU-RC-2026 §2.1", "charge_code": "OFR", "title": "Ocean freight, Nhava Sheva–Hamburg", "rate": 1400, "unit": "per 40' container", "text": "Ocean freight Nhava Sheva (INNSA) to Hamburg (DEHAM) is USD 1,400 per 40' container. All charges under this contract are invoiced and settled in US dollars only."},
+        {"clause_id": "HLCU-RC-2026 §2.3", "charge_code": "THC", "title": "Terminal handling", "rate": 210, "unit": "per container", "text": "Terminal handling charge: USD 210 per container at the port of discharge."},
+        {"clause_id": "HLCU-RC-2026 §4.1", "charge_code": "DOC", "title": "Documentation fee", "rate": 60, "unit": "per bill of lading", "text": "Documentation fee: USD 60 per bill of lading."}
+      ]
+    }
+  ],
+  "purchase_orders": [
+    {"po_number": "PO-W2-001", "carrier_scac": "MAEU", "currency": "USD", "bol_number": "MAEU2609201", "lines": [{"charge_code": "THC", "qty": 2, "unit_rate": 240}, {"charge_code": "DOC", "qty": 1, "unit_rate": 75}]},
+    {"po_number": "PO-W2-002", "carrier_scac": "MAEU", "currency": "USD", "bol_number": "MAEU2609202", "lines": [{"charge_code": "OFR", "qty": 3, "unit_rate": 1850}, {"charge_code": "THC", "qty": 3, "unit_rate": 240}, {"charge_code": "DOC", "qty": 1, "unit_rate": 75}]},
+    {"po_number": "PO-W2-003", "carrier_scac": "HLCU", "currency": "USD", "bol_number": "HLCU2609203", "lines": [{"charge_code": "OFR", "qty": 1, "unit_rate": 1400}, {"charge_code": "DOC", "qty": 1, "unit_rate": 60}]},
+    {"po_number": "PO-W2-004", "carrier_scac": "MAEU", "currency": "USD", "bol_number": "MAEU2609204", "lines": [{"charge_code": "OFR", "qty": 3, "unit_rate": 1850}, {"charge_code": "THC", "qty": 3, "unit_rate": 240}, {"charge_code": "DOC", "qty": 1, "unit_rate": 75}]},
+    {"po_number": "PO-W2-006", "carrier_scac": "MAEU", "currency": "USD", "bol_number": "MAEU2609206", "lines": [{"charge_code": "THC", "qty": 1, "unit_rate": 240}, {"charge_code": "DOC", "qty": 1, "unit_rate": 75}]},
+    {"po_number": "PO-W2-007", "carrier_scac": "HLCU", "currency": "USD", "bol_number": "HLCU2609207", "lines": [{"charge_code": "OFR", "qty": 1, "unit_rate": 1400}, {"charge_code": "DOC", "qty": 1, "unit_rate": 60}]},
+    {"po_number": "PO-W2-008", "carrier_scac": "MAEU", "currency": "USD", "bol_number": "MAEU2609208", "lines": [{"charge_code": "OFR", "qty": 6, "unit_rate": 1850}, {"charge_code": "THC", "qty": 6, "unit_rate": 240}, {"charge_code": "DOC", "qty": 1, "unit_rate": 75}]}
+  ],
+  "container_events": [
+    {"container_no": "MSKU2609061", "event_type": "gate_out", "location": "NLRTM", "event_time": "2026-09-10T08:00:00Z"},
+    {"container_no": "MSKU2609061", "event_type": "gate_in", "location": "NLRTM", "event_time": "2026-09-13T15:00:00Z"}
+  ],
+  "cases": [
+    {
+      "file": "inv_01.pdf", "planted": null, "expect": {"acme": "pay", "bolt": "pay"},
+      "fields": {"invoice_no": "MAEU-INV-26-0101", "carrier_scac": "MAEU", "invoice_date": "2026-09-15", "po_number": "PO-W2-001", "bol_number": "MAEU2609201", "currency": "USD", "container_numbers": ["MSKU2609011", "MSKU2609012"],
+        "lines": [{"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 2, "unit_rate": 240, "amount": 480}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}], "subtotal": 555, "total": 555}
+    },
+    {
+      "file": "inv_02.pdf", "planted": null, "expect": {"acme": "l1_only", "bolt": "l1_then_l2+l3"},
+      "fields": {"invoice_no": "MAEU-INV-26-0102", "carrier_scac": "MAEU", "invoice_date": "2026-09-16", "po_number": "PO-W2-002", "bol_number": "MAEU2609202", "currency": "USD", "container_numbers": ["MSKU2609021", "MSKU2609022", "MSKU2609023"],
+        "lines": [{"charge_code": "OFR", "description": "Ocean freight CNSHA-NLRTM 40'", "qty": 3, "unit_rate": 1850, "amount": 5550}, {"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 3, "unit_rate": 240, "amount": 720}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}], "subtotal": 6345, "total": 6345}
+    },
+    {
+      "file": "inv_03.pdf", "planted": null, "expect": {"acme": "pay", "bolt": "l1_only"},
+      "fields": {"invoice_no": "HLCU-26-77031", "carrier_scac": "HLCU", "invoice_date": "2026-09-17", "po_number": "PO-W2-003", "bol_number": "HLCU2609203", "currency": "USD", "container_numbers": ["HLXU2609031"],
+        "lines": [{"charge_code": "OFR", "description": "Ocean freight INNSA-DEHAM 40'", "qty": 1, "unit_rate": 1400, "amount": 1400}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 60, "amount": 60}], "subtotal": 1460, "total": 1460}
+    },
+    {
+      "file": "inv_04.pdf", "planted": "RATE_OVER_CONTRACT", "expect": {"acme": "l1_then_l2", "bolt": "l1_then_l2+l3"}, "cited_clause": "MAEU-RC-2026 §3.1",
+      "fields": {"invoice_no": "MAEU-INV-26-0104", "carrier_scac": "MAEU", "invoice_date": "2026-09-18", "po_number": "PO-W2-004", "bol_number": "MAEU2609204", "currency": "USD", "container_numbers": ["MSKU2609041", "MSKU2609042", "MSKU2609043"],
+        "lines": [{"charge_code": "OFR", "description": "Ocean freight CNSHA-NLRTM 40'", "qty": 3, "unit_rate": 1980, "amount": 5940}, {"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 3, "unit_rate": 240, "amount": 720}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}], "subtotal": 6735, "total": 6735}
+    },
+    {
+      "file": "inv_05.pdf", "planted": "DUPLICATE", "expect": {"acme": "rejected", "bolt": "rejected"},
+      "fields": {"invoice_no": "MAEU-INV-26-0101", "carrier_scac": "MAEU", "invoice_date": "2026-09-22", "po_number": "PO-W2-001", "bol_number": "MAEU2609201", "currency": "USD", "container_numbers": ["MSKU2609011", "MSKU2609012"],
+        "lines": [{"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 2, "unit_rate": 240, "amount": 480}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}], "subtotal": 555, "total": 555}
+    },
+    {
+      "file": "inv_06.pdf", "planted": "DET_NOT_SUPPORTED", "expect": {"acme": "l1_then_l2", "bolt": "l1_then_l2"}, "cited_clause": "MAEU-RC-2026 §7.1",
+      "fields": {"invoice_no": "MAEU-INV-26-0106", "carrier_scac": "MAEU", "invoice_date": "2026-09-20", "po_number": "PO-W2-006", "bol_number": "MAEU2609206", "currency": "USD", "container_numbers": ["MSKU2609061"],
+        "lines": [{"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 1, "unit_rate": 240, "amount": 240}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}, {"charge_code": "DET", "description": "Detention MSKU2609061, 4 days", "qty": 4, "unit_rate": 95, "amount": 380}], "subtotal": 695, "total": 695}
+    },
+    {
+      "file": "inv_07.pdf", "planted": "CURRENCY_MISMATCH", "expect": {"acme": "l1_then_l2", "bolt": "l1_then_l2"}, "cited_clause": "HLCU-RC-2026 §2.1",
+      "fields": {"invoice_no": "HLCU-26-77037", "carrier_scac": "HLCU", "invoice_date": "2026-09-21", "po_number": "PO-W2-007", "bol_number": "HLCU2609207", "currency": "EUR", "container_numbers": ["HLXU2609071"],
+        "lines": [{"charge_code": "OFR", "description": "Ocean freight INNSA-DEHAM 40'", "qty": 1, "unit_rate": 1400, "amount": 1400}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 60, "amount": 60}], "subtotal": 1460, "total": 1460}
+    },
+    {
+      "file": "inv_08.pdf", "planted": "OVER_L2_LIMIT", "expect": {"acme": "l1_then_l2", "bolt": "l1_then_l2+l3"},
+      "fields": {"invoice_no": "MAEU-INV-26-0108", "carrier_scac": "MAEU", "invoice_date": "2026-09-23", "po_number": "PO-W2-008", "bol_number": "MAEU2609208", "currency": "USD", "container_numbers": ["MSKU2609081", "MSKU2609082", "MSKU2609083", "MSKU2609084", "MSKU2609085", "MSKU2609086"],
+        "lines": [{"charge_code": "OFR", "description": "Ocean freight CNSHA-NLRTM 40'", "qty": 6, "unit_rate": 1850, "amount": 11100}, {"charge_code": "THC", "description": "Terminal handling Rotterdam", "qty": 6, "unit_rate": 240, "amount": 1440}, {"charge_code": "DOC", "description": "Documentation fee", "qty": 1, "unit_rate": 75, "amount": 75}], "subtotal": 12615, "total": 12615}
+    }
+  ]
+}

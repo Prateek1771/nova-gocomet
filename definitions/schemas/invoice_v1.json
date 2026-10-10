@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "invoice_v1",
+  "title": "Freight invoice v1 (docs/04 W2)",
+  "x-nova-prompt": "invoice_no exactly as printed. carrier_scac is the 4-letter carrier code. currency is the 3-letter ISO code the invoice is billed in. lines has one entry per row of the charges table: charge_code as printed (e.g. OFR, THC, DOC, DET), qty as a number (containers, days or documents), unit_rate and amount in the invoice currency. total is the amount due.",
+  "x-nova-evidence": {"lines": {"lines": ["amount"]}},
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invoice_no", "carrier_scac", "currency", "lines", "total"],
+  "properties": {
+    "invoice_no": {"type": "string", "description": "invoice number"},
+    "carrier_scac": {"type": "string", "description": "4-letter carrier SCAC code"},
+    "invoice_date": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "po_number": {"type": ["string", "null"], "description": "purchase order reference"},
+    "bol_number": {"type": ["string", "null"], "description": "B/L reference"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217, e.g. USD"},
+    "container_numbers": {"type": "array", "items": {"type": "string"}},
+    "lines": {
+      "type": "array",
+      "description": "one row per line of the charges table",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "charge_code": {"type": ["string", "null"]},
+          "description": {"type": ["string", "null"]},
+          "qty": {"type": ["number", "null"]},
+          "unit_rate": {"type": ["number", "null"]},
+          "amount": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "subtotal": {"type": ["number", "null"]},
+    "total": {"type": "number", "description": "amount due"}
+  }
+}

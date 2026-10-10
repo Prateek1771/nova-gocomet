@@ -20,6 +20,22 @@ agents:
       extraction: {type: expression, required: true}
       severity: {type: expression}
     outputs: [issues, max_severity]
+  - key: invoice_dedupe
+    title: Invoice duplicate check
+    tier: reason
+    description: Deterministic, no model. Has this carrier's invoice number been received before on an earlier document?
+    with:
+      document_id: {type: string, required: true}
+      extraction: {type: expression, required: true}
+    outputs: [duplicate, prior_document_id]
+  - key: invoice_matcher
+    title: Invoice ↔ PO matcher
+    tier: reason
+    description: Maps lines to the PO with FX, checks currency and quantities, finds each line's rate-contract clause (Weaviate hybrid search; the model picks and cites it, code verifies), prices detention against dwell facts.
+    with:
+      document_id: {type: string, required: true}
+      extraction: {type: expression, required: true}
+    outputs: [matches, total_usd, variance_pct, issues, max_severity, cited_clauses, accessorials]
 
 actions:
   - key: noop
@@ -36,11 +52,29 @@ actions:
     description: Creates or updates the shipment for a BoL in the TMS (idempotent per run step).
     with:
       fields: {type: expression, required: true}
+  - key: erp.post_payable
+    title: ERP · post payable
+    description: Posts the approved invoice as a payable (once per carrier + invoice number).
+    with:
+      fields: {type: expression, required: true}
+      document_id: {type: string}
+      amount_usd: {type: expression}
+  - key: carrier.dispute_email
+    title: Carrier · dispute email
+    description: Queues a dispute email to the carrier; every disputed line cites its contract clause.
+    with:
+      fields: {type: expression, required: true}
+      issues: {type: expression, required: true}
+      clauses: {type: expression, required: true}
+      reason: {type: string}
 
 apps:
   - key: bol_review
     title: Bill of Lading review
     description: PDF with evidence boxes, issues, editable fields, approve/reject.
+  - key: invoice_review
+    title: Invoice review
+    description: Invoice PDF, findings, line-by-line comparison against PO and contract with cited clauses; approve, dispute or reject.
   - key: generic_review
     title: Generic approval
     builtin: true

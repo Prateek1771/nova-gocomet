@@ -219,7 +219,7 @@ async def test_studio_publish_pins_in_flight_runs_and_streams(w1: dict[str, Any]
     """M3 exit criterion at the API: publish v2 while a run waits on v1; it finishes on v1, new runs use v2.
     Plus catalog-backed validation, the versions list and the SSE stream."""
     c = w1["c"]
-    assert {a["key"] for a in (await c.get("/catalog/agents")).json()} == {"doc_extractor", "bol_validator"}
+    assert {a["key"] for a in (await c.get("/catalog/agents")).json()} >= {"doc_extractor", "bol_validator"}
     assert "tms.upsert_shipment" in {a["key"] for a in (await c.get("/catalog/actions")).json()}
 
     v1 = (await c.get("/workflows/bol_intake/versions")).json()

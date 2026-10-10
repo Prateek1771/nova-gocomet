@@ -339,10 +339,10 @@ async def test_budget_exhausted_degrades_to_a_human_then_retries(run: Any) -> No
     fix = next(t for t in run.fake.tasks if t.title)
     assert fix.app_key == "step_failure" and fix.title.startswith("LLM budget exhausted")
     assert fix.payload["error_type"] == "BudgetExceeded"
-    assert "needs_attention" in run.fake.run_statuses()
     run.fake.budget_left = True  # an admin raised the budget
     await decide_task(h, "retry", user="admin")
     assert (await h.result()).status == "completed"
+    assert "needs_attention" in run.fake.run_statuses()  # projected by then (the task can show first)
 
 
 BAD_RULE = """

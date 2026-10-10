@@ -8,7 +8,7 @@
       {"type": "stack", "children": [
         {"type": "IssueList", "bind": {"issues": "$.issues", "why": "$.why"}},
         {"type": "FieldForm", "schema": "bol_v1", "bind": {"fields": "$.fields", "confidence": "$.confidence", "evidence": "$.evidence"}},
-        {"type": "DecisionBar", "options": ["approved", "rejected"], "requireReasonFor": ["rejected"]}
+        {"type": "DecisionBar", "options": ["approved", "rejected"], "requireReasonFor": ["rejected"], "sendsFields": true, "approveLabel": "Approve & push"}
       ]}
     ]
   },

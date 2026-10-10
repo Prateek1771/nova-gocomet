@@ -239,19 +239,60 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
 **Goal:** match & approve (pattern B) for both tenants.
 
 ### Tasks
-- [ ] `invoice_v1` schema + DocType; 8 invoices with planted errors; POs, rate contracts, clauses seeded.
-- [ ] `invoice_matcher`: deterministic line mapping + FX → clause search in Weaviate (`nova-embed`) → LLM confirms rate and cites the clause ID.
-- [ ] Accessorial `decide` using dwell facts.
-- [ ] Approval matrix in TenantConfig; Bolt L3 via `subflow`.
-- [ ] ComparisonTable micro-app; `erp.post_payable` and `carrier.dispute_email` actions.
+- [x] **Schema and seed data:**
+  - `invoice_v1` schema (`definitions/schemas/invoice_v1.json`) for the existing `invoice` DocType.
+  - 8 invoices with planted errors (`scripts/gen_invoices.py`, `make invoices`, seed `definitions/seed/invoice_cases.json`).
+  - POs, rate contracts with citable clauses, container events and FX are seeded per tenant (migration 0005).
+  - The extractor now reads prompt hints and evidence rules from the schema (`x-nova-prompt` / `x-nova-evidence`), so it holds no BoL text.
+- [x] **`invoice_matcher`** (`services/agents/src/nova_agents/invoices.py`):
+  - Deterministic line mapping to the PO + FX → `CURRENCY_MISMATCH`, `QTY_MISMATCH`, `LINE_NOT_ON_PO`.
+  - Clause search in Weaviate (hybrid, our own vectors from `nova-embed`, one tenant shard per Nova tenant; [ADR-030](06-adrs.md#adr-030-weaviate-in-core-our-own-vectors-from-nova-embed-plain-httpx)).
+  - The LLM picks and cites a clause id; code keeps the pick only if it was retrieved, takes the rate from Postgres, and raises `RATE_OVER_CONTRACT` ([ADR-032](06-adrs.md#adr-032-w2-build-decisions)).
+  - Plus `invoice_dedupe`, deterministic with no model.
+- [x] **Accessorial `decide`** on dwell facts: container gate-out → gate-in minus the contract's free time. The facts are read from Postgres `container_events` until M6 ([ADR-031](06-adrs.md#adr-031-dwell-facts-from-postgres-container_events-until-m6)), with a deterministic `DET_NOT_SUPPORTED` first.
+- [x] **Approval matrix** in TenantConfig `invoice.*` (Acme 2/2000/10000/5, Bolt 1/1000/5000/3). Bolt's L3 controller runs as a `subflow` (`controller_signoff`). Every review task carries `amount`, so OpenFGA `within_limit` applies. The seed adds new config keys to tenants that already published later versions.
+- [x] **ComparisonTable micro-app**: line vs PO vs contract in USD, variance badge, clause chips that expand to the contract text, detention bar showing dwell vs free time.
+- [x] **Actions**: `erp.post_payable` (posted payable, once per carrier + number) and `carrier.dispute_email` (outbox; the body quotes the clause and the reviewer's reason).
+- [x] **UI**: DecisionBar has a Dispute outcome and neutral labels, and the upload zone has a document-type switch.
 
 ### Tests
-- [ ] Each planted invoice routes to the expected branch for Acme **and** Bolt.
-- [ ] Approval-limit matrix: every role × amount band.
-- [ ] Duplicate invoice → auto-reject with no LLM call after extraction.
+- [x] **Routing:** each planted invoice routes to the expected branch for Acme **and** Bolt:
+  - unit: the real matcher on the seed, plus the real approval rules from both YAMLs, 16 cases
+  - engine: the real YAMLs on time-skipping Temporal: pay, duplicate, L1→L2→dispute, Bolt L3 approve/reject
+  - integration: all 8 × 2 tenants end to end on real Postgres + Weaviate + Temporal + OpenFGA (`tests/integration/test_w2_invoices.py`)
+- [x] **Approval-limit matrix:** every role × amount band (≤L0, L0–L2, above L2, above finance) on real OpenFGA (`test_rbac.py`).
+- [x] **Duplicate:** auto-reject with no LLM call after extraction (the transport log shows only the extraction call for that run).
+- [x] **Disputes:** the dispute email body contains the cited clause id and text plus the reviewer's reason; a dispute without a reason gets a 422.
+- [x] **Weaviate cross-tenant:** a clause indexed for Bolt can't be found from Acme's shard.
 
 ### Exit criteria
-- [ ] All 8 cases route correctly for both tenants; disputes carry the cited clause in the email body.
+- [x] All 8 cases route correctly for both tenants; disputes carry the cited clause in the email body.
+  - Live on the stack (2026-10-10): **16/16 routed as specified**, with the free-tier models and real nomic embeddings + Weaviate, at 6–33 s per invoice. Every planted error got its code and the right clause.
+  - Headed Chrome, 6/6:
+    - doc-type upload → duplicate auto-rejected
+    - demo 4: over-contract L1 → L2 dispute, with the email citing MAEU-RC-2026 §3.1
+    - demo 8: ops lead refused on $12.6K
+    - detention dwell vs free time
+    - demo 5: Bolt L1 → L2 → L3 subflow → paid
+
+### Verification (2026-10-10)
+- **Automated:** lint, mypy, import contracts; unit 132; engine 28 (100% branch); integration (incl. the W2 end-to-end, RBAC 22, staging realm); gen drift; web build.
+- **Found and fixed during the build:**
+  - live tenants on later config versions lacked `invoice.*`, so the seed now adds missing keys as a new version
+  - the ComparisonTable clause column overflowed, so the chip moved under the line
+  - a racy assertion in the M4 budget engine test
+- **Final test on `LLM_MODE=openai` (ADR-033):**
+  - Automated: unit 132, engine 28 (100% branch), vitest 23, integration 52, static gates, gen drift and the web build all pass.
+  - Live eval (`docs/evals/openai-baseline.json`): extraction F1 0.972, validator recall 1.0, decide 40/40.
+  - Live runs: W1 10/10, W2 16/16 with every priced line cited, at about 9 s per document and $0.029 for the 26 runs.
+  - First live budget stop: an over-budget Bolt run → needs_attention ("Budget has been exceeded") → raise the budget → Retry → paid.
+  - Headed Chrome: M0–M4 10/10, M5 6/6.
+  - Found and fixed:
+    - the gateway ignored a per-run `LLM_MODE`, so compose now passes it to LiteLLM
+    - gpt-4.1-nano scored 0.80 on decide, so decide uses gpt-4.1-mini
+    - the BoL `material_issue` criteria didn't name HS/description conflicts or date order, so mini answered "not material"; the criteria now name them
+    - gpt-4.1-mini mangled `§` when echoing clause ids, so every citation was discarded; the matcher now has the model pick a candidate by number and maps it back in code
+    - the detention criteria now name `chargeable_days` explicitly, because the model had compared against free time
 
 ---
 

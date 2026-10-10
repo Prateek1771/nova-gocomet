@@ -2,7 +2,7 @@
 
 Nova is GoComet's governed AI platform for enterprise logistics. This repo is a working prototype of it: a generic YAML workflow engine on Temporal, governed LangGraph agents, micro-apps for human steps, and a tenant-isolated data layer. It runs three workflows: W1 BoL intake, W2 invoice ↔ PO match + approval, and W3 shipment exception monitoring. The source brief is `note.md`.
 
-**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS), M1 (DSL, generic Temporal interpreter, workflow/run/task API) M2 (W1 BoL slice: uploads, governed agents, Jev decide, inbox + bol_review micro-app, evals) and M3 (Studio: React Flow + Monaco editor over canonical YAML, catalog, publish/versions, live SSE run graph) and M4 (Governance: OpenFGA authz with approval limits, Bolt tenant, audit hash chain, per-tenant LLM budgets, Langfuse + OTel collector, staging MFA realm) are done. Next: M5 (W2 Invoice). Tick tasks in 07 as they land.
+**Status:** building, one milestone at a time, against `docs/07-build-plan.md`. M0 (skeleton: Keycloak login, BFF, FastAPI, RLS), M1 (DSL, generic Temporal interpreter, workflow/run/task API) M2 (W1 BoL slice: uploads, governed agents, Jev decide, inbox + bol_review micro-app, evals) and M3 (Studio: React Flow + Monaco editor over canonical YAML, catalog, publish/versions, live SSE run graph) and M4 (Governance: OpenFGA authz with approval limits, Bolt tenant, audit hash chain, per-tenant LLM budgets, Langfuse + OTel collector, staging MFA realm) and M5 (W2 invoice ↔ PO match: invoice_matcher with Weaviate clause search + grounded citations, approval matrix, Bolt L3 subflow, ComparisonTable, dispute emails) are done. Next: M6 (Data layer + W3). Tick tasks in 07 as they land.
 
 ## Docs (read before changing anything)
 
@@ -40,15 +40,15 @@ Next.js (App Router) + React 19 + React Flow + shadcn/Tailwind v4 · FastAPI · 
 
 ## Cost: keep LLM spend near zero
 
-- `LLM_MODE=local|free|cheap|demo`. **`free` is the dev default** ($0: Groq free tier, OpenRouter `:free` fallback; synthetic docs only, ADR-025). `cheap`/`demo` are the paid OpenRouter paths for later; use `demo` only for recording the demo.
+- `LLM_MODE=local|free|cheap|demo`. **`free` is the dev default** ($0: Groq free tier, OpenRouter `:free` fallback; synthetic docs only, ADR-025). `openai` (ADR-033) is paid-quality testing on gpt-4.1-mini/nano, where per-tenant budgets really trip (`LLM_MODE=openai docker compose …`). `cheap`/`demo` are the paid OpenRouter paths for later; use `demo` only for recording the demo.
 - Embeddings use Ollama `nomic-embed-text`.
 - Dev machine: 32 GB RAM, 4-core i5, no GPU, so local models are CPU-only and slow. Tests use recorded LLM responses (VCR); don't add live LLM calls to unit tests.
 
 ## Commands
 
-`make up` (core stack) · `make down` · `make seed` · `make test` (unit + Temporal time-skipping engine tests, 100% branch gate) · `make test-int` (testcontainers) · `make lint` · `make gen` (DSL schema, OpenAPI, web TS types; CI fails on drift) · `make ci`. `make bols` (seed BoL PDFs) · `make bench-llm` (live eval → `docs/evals/`) · `make redteam` (injection suite, live). `make up-full` (core + ai: Langfuse on :3400, login dev@nova.test / nova-dev-password) · `make audit-verify`. Coming later: `make up-local`, `make demo`. No `make` on Windows: `winget install ezwinports.make`, or run the Makefile lines directly.
+`make up` (core stack) · `make down` · `make seed` · `make test` (unit + Temporal time-skipping engine tests, 100% branch gate) · `make test-int` (testcontainers) · `make lint` · `make gen` (DSL schema, OpenAPI, web TS types; CI fails on drift) · `make ci`. `make bols` / `make invoices` (seed PDFs) · `make reindex` (clauses → Weaviate) · `make bench-llm` (live eval → `docs/evals/`) · `make redteam` (injection suite, live). `make up-full` (core + ai: Langfuse on :3400, login dev@nova.test / nova-dev-password) · `make audit-verify`. Coming later: `make up-local`, `make demo`. No `make` on Windows: `winget install ezwinports.make`, or run the Makefile lines directly.
 
-Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Jaeger traces <http://localhost:16686> · LiteLLM 4100 (key `sk-nova-dev`) · MinIO 9100, console 9101 (nova/nova-dev-secret) · Postgres 5433 · OpenFGA 8081. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
+Local ports: web <http://localhost:3300> · api 8100 (Swagger `/api/docs`; token: `uv run python scripts/dev_token.py ops@acme`) · Keycloak 8180 (admin/admin) · Temporal 7233, UI <http://localhost:8233> · Jaeger traces <http://localhost:16686> · LiteLLM 4100 (key `sk-nova-dev`) · MinIO 9100, console 9101 (nova/nova-dev-secret) · Postgres 5433 · OpenFGA 8081 · Weaviate 8090. Dev users are in `infra/keycloak/realm-nova.json` (password `dev`). Login is identity-first: username, then password.
 
 ## Conventions
 

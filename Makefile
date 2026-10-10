@@ -2,7 +2,7 @@
 # lines below directly.
 COMPOSE = docker compose -f infra/docker-compose.yml --profile core
 
-.PHONY: up up-full down logs seed test test-int lint fmt gen ci bols bench-llm redteam audit-verify
+.PHONY: up up-full down logs seed test test-int lint fmt gen ci bols invoices reindex bench-llm redteam audit-verify
 
 up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
@@ -44,6 +44,12 @@ gen:           ## regenerate DSL JSON Schema, OpenAPI and the web TS types
 
 bols:          ## render the 10 W1 seed BoLs (definitions/seed/bol_cases.json) to data/seed/bol
 	uv run python scripts/gen_bols.py
+
+invoices:      ## render the 8 W2 seed invoices (definitions/seed/invoice_cases.json) to data/seed/invoice
+	uv run python scripts/gen_invoices.py
+
+reindex:       ## re-embed every tenant's contract clauses into Weaviate (idempotent; needs the stack up)
+	WEAVIATE_URL=http://localhost:8090 LLM_BASE_URL=http://localhost:4100 uv run python -m nova_api.clauses
 
 bench-llm:     ## live LLM eval + timings against the running gateway (~$0.01 in cheap) -> docs/evals
 	LLM_BASE_URL=http://localhost:4100 JEV_MODEL=typesafe/jev-1.13 uv run python scripts/eval_llm.py

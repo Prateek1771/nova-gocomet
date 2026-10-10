@@ -1,0 +1,170 @@
+{
+ "mode": "openai",
+ "extraction": {
+  "docs": 10,
+  "field_f1": {
+   "bol_number": 1.0,
+   "carrier_scac": 1.0,
+   "shipper": 0.9,
+   "consignee": 1.0,
+   "notify_party": 1.0,
+   "vessel": 1.0,
+   "voyage": 0.9,
+   "pol": 1.0,
+   "pod": 1.0,
+   "container_numbers": 0.9,
+   "seal_numbers": 1.0,
+   "package_count": 1.0,
+   "gross_weight_kg": 1.0,
+   "description_of_goods": 0.75,
+   "hs_codes": 1.0,
+   "freight_terms": 1.0,
+   "issue_date": 1.0,
+   "booking_ref": 1.0
+  },
+  "micro_f1": 0.972,
+  "p50_s": 3.18576,
+  "p95_s": 5.1022799999999995,
+  "cost_usd": 0.01028,
+  "per_doc": [
+   {
+    "file": "bol_01.pdf",
+    "mode": "text",
+    "min_conf": 0.96,
+    "wrong_fields": [
+     "description_of_goods"
+    ],
+    "issues": [],
+    "expected": [],
+    "ms": 3499
+   },
+   {
+    "file": "bol_02.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [],
+    "issues": [],
+    "expected": [],
+    "ms": 3261
+   },
+   {
+    "file": "bol_03.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [],
+    "issues": [],
+    "expected": [],
+    "ms": 2998
+   },
+   {
+    "file": "bol_04.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [
+     "description_of_goods"
+    ],
+    "issues": [],
+    "expected": [],
+    "ms": 2722
+   },
+   {
+    "file": "bol_05.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [
+     "description_of_goods"
+    ],
+    "issues": [
+     "CNTR_CHECK_DIGIT"
+    ],
+    "expected": [
+     "CNTR_CHECK_DIGIT"
+    ],
+    "ms": 3186
+   },
+   {
+    "file": "bol_06.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [],
+    "issues": [
+     "CNTR_CHECK_DIGIT"
+    ],
+    "expected": [
+     "CNTR_CHECK_DIGIT"
+    ],
+    "ms": 2630
+   },
+   {
+    "file": "bol_07.pdf",
+    "mode": "text",
+    "min_conf": 0.96,
+    "wrong_fields": [
+     "description_of_goods"
+    ],
+    "issues": [
+     "LOCODE_UNKNOWN"
+    ],
+    "expected": [
+     "LOCODE_UNKNOWN"
+    ],
+    "ms": 2813
+   },
+   {
+    "file": "bol_08.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [],
+    "issues": [
+     "BOOKING_MISMATCH"
+    ],
+    "expected": [
+     "BOOKING_MISMATCH"
+    ],
+    "ms": 3368
+   },
+   {
+    "file": "bol_09.pdf",
+    "mode": "text",
+    "min_conf": 1.0,
+    "wrong_fields": [],
+    "issues": [
+     "WEIGHT_SUM"
+    ],
+    "expected": [
+     "WEIGHT_SUM"
+    ],
+    "ms": 2436
+   },
+   {
+    "file": "bol_10.pdf",
+    "mode": "vision",
+    "min_conf": 0.6,
+    "wrong_fields": [
+     "shipper",
+     "voyage",
+     "container_numbers"
+    ],
+    "issues": [
+     "CNTR_CHECK_DIGIT"
+    ],
+    "expected": [],
+    "ms": 5102
+   }
+  ]
+ },
+ "validator": {
+  "planted": 5,
+  "found": 5,
+  "recall": 1.0,
+  "false_alarms": 1
+ },
+ "decide": {
+  "n": 40,
+  "accuracy": 1.0,
+  "p50_s": 0.85,
+  "p95_s": 1.46,
+  "cost_usd": 0.00587,
+  "misses": []
+ }
+}

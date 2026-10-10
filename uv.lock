@@ -1220,6 +1220,7 @@ version = "0.0.0"
 source = { editable = "packages/nova_core" }
 dependencies = [
     { name = "asyncpg" },
+    { name = "httpx" },
     { name = "minio" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-asyncpg" },
@@ -1235,6 +1236,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.30" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "minio", specifier = ">=7.2.20" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.28" },
     { name = "opentelemetry-instrumentation-asyncpg", specifier = ">=0.66b1" },

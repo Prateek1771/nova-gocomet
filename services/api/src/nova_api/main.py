@@ -10,7 +10,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
-from nova_api import errors
+from nova_api import clauses, errors
 from nova_api.authz import TenantCaller, allowed
 from nova_api.deps import CallerDep
 from nova_api.routers import admin, apps, audit, catalog, config, documents, runs, tasks, workflows
@@ -26,10 +26,12 @@ tracing = configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    task = asyncio.create_task(admin.provision_all()) if settings.llm_key_secret else None
+    tasks = [asyncio.create_task(clauses.index_all())]
+    if settings.llm_key_secret:
+        tasks.append(asyncio.create_task(admin.provision_all()))
     yield
-    if task:
-        task.cancel()
+    for t in tasks:
+        t.cancel()
 
 
 app = FastAPI(

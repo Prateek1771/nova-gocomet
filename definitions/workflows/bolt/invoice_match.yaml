@@ -1,0 +1,190 @@
+# W2 · Freight invoice ↔ PO match + approval, Bolt's variant (docs/04 W2, FR-X.2). Same as Acme's, plus
+# a third level: after finance approves, amounts above Bolt's L2 limit need a controller's sign-off,
+# run as a subflow (controller_signoff). Started by an upload of doc_type invoice.
+# Every threshold comes from TenantConfig `invoice.*` (rule 2); approver authority is checked again by
+# OpenFGA within_limit at completion, from the `amount` each review task carries.
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: invoice_match
+  title: Freight invoice match & approval
+trigger:
+  type: document_upload
+  doc_type: invoice
+inputs:
+  document_id: {type: string}
+nodes:
+  - id: extract
+    type: agent
+    agent: doc_extractor
+    with: {document_id: "${{ input.document_id }}", schema: invoice_v1}
+    retry: {max_attempts: 3}
+    timeout: 180s
+  - id: dedupe
+    type: agent
+    agent: invoice_dedupe
+    with: {document_id: "${{ input.document_id }}", extraction: "${{ nodes.extract.output }}"}
+    timeout: 30s
+  - id: dup
+    type: rule
+    cases:
+      - when: "nodes.dedupe.output.duplicate"  # a re-sent invoice: rejected before any model call
+        goto: duplicate
+    default: match
+  - id: match
+    type: agent
+    agent: invoice_matcher
+    with: {document_id: "${{ input.document_id }}", extraction: "${{ nodes.extract.output }}"}
+    retry: {max_attempts: 3}
+    timeout: 120s
+  - id: accessorials
+    type: decide
+    questions:
+      - id: unjustified
+        ask: "Is any detention or demurrage charge on this invoice not supported by the container's events and the contract's free time?"
+        context: "${{ nodes.match.output.accessorials }}"  # empty (no accessorials) = false, no model call
+        criteria:
+          "true": >-
+            For some charge, charged_days is greater than chargeable_days (days out minus free days; compare
+            with chargeable_days, never with free_time_days), or chargeable_days is null because there are
+            no gate-out/gate-in events to support the charge.
+          "false": "Every accessorial charge is within the chargeable days the events and free time allow."
+        threshold: 0.5
+    timeout: 60s
+  - id: approval
+    type: rule
+    cases:
+      # deterministic first: any high finding, an unjustified accessorial, or a big amount or variance
+      # needs two levels
+      - when: >-
+          nodes.match.output.max_severity == 'high' || nodes.accessorials.output.unjustified ||
+          double(nodes.match.output.total_usd) > double(tenant.invoice.l2_limit_usd) ||
+          double(nodes.match.output.variance_pct) > double(tenant.invoice.l2_variance_pct)
+        goto: l1_l2
+      - when: >-
+          double(nodes.match.output.variance_pct) <= double(tenant.invoice.auto_variance_pct) &&
+          double(nodes.match.output.total_usd) <= double(tenant.invoice.auto_limit_usd)
+        goto: pay
+    default: l1
+  - id: l1
+    type: human_task
+    title: "Approve invoice ${{ nodes.extract.output.fields.invoice_no }} · ${{ int(nodes.match.output.total_usd) }} USD"
+    assignee: {role: ops_lead}
+    app: invoice_review
+    sla: 24h
+    escalate: {after: 24h, to: {role: finance}}
+    outputs: [approved, dispute, rejected]
+    with:
+      amount: "${{ nodes.match.output.total_usd }}"
+      level: L1
+      document_id: "${{ input.document_id }}"
+      fields: "${{ nodes.extract.output.fields }}"
+      evidence: "${{ nodes.extract.output.evidence }}"
+      issues: "${{ nodes.match.output.issues }}"
+      matches: "${{ nodes.match.output.matches }}"
+      cited_clauses: "${{ nodes.match.output.cited_clauses }}"
+      accessorials: "${{ nodes.match.output.accessorials }}"
+      variance_pct: "${{ nodes.match.output.variance_pct }}"
+      why: "${{ nodes.accessorials.output.why }}"
+  - id: l1_l2
+    type: human_task
+    title: "L1 · invoice ${{ nodes.extract.output.fields.invoice_no }} · ${{ int(nodes.match.output.total_usd) }} USD (then finance)"
+    assignee: {role: ops_lead}
+    app: invoice_review
+    sla: 24h
+    escalate: {after: 24h, to: {role: finance}}
+    outputs: [approved, dispute, rejected]
+    with:
+      amount: "${{ nodes.match.output.total_usd }}"
+      level: L1 (then finance)
+      document_id: "${{ input.document_id }}"
+      fields: "${{ nodes.extract.output.fields }}"
+      evidence: "${{ nodes.extract.output.evidence }}"
+      issues: "${{ nodes.match.output.issues }}"
+      matches: "${{ nodes.match.output.matches }}"
+      cited_clauses: "${{ nodes.match.output.cited_clauses }}"
+      accessorials: "${{ nodes.match.output.accessorials }}"
+      variance_pct: "${{ nodes.match.output.variance_pct }}"
+      why: "${{ nodes.accessorials.output.why }}"
+  - id: l2
+    type: human_task
+    title: "L2 · invoice ${{ nodes.extract.output.fields.invoice_no }} · ${{ int(nodes.match.output.total_usd) }} USD"
+    assignee: {role: finance}
+    app: invoice_review
+    sla: 48h
+    outputs: [approved, dispute, rejected]
+    with:
+      amount: "${{ nodes.match.output.total_usd }}"
+      level: L2
+      document_id: "${{ input.document_id }}"
+      fields: "${{ nodes.extract.output.fields }}"
+      evidence: "${{ nodes.extract.output.evidence }}"
+      issues: "${{ nodes.match.output.issues }}"
+      matches: "${{ nodes.match.output.matches }}"
+      cited_clauses: "${{ nodes.match.output.cited_clauses }}"
+      accessorials: "${{ nodes.match.output.accessorials }}"
+      variance_pct: "${{ nodes.match.output.variance_pct }}"
+      why: "${{ nodes.accessorials.output.why }}"
+  - id: l3_gate
+    type: rule
+    cases:
+      - when: "double(nodes.match.output.total_usd) > double(tenant.invoice.l2_limit_usd)"
+        goto: l3
+    default: pay
+  - id: l3
+    type: subflow
+    workflow: controller_signoff
+    with:
+      amount: "${{ nodes.match.output.total_usd }}"
+      invoice_no: "${{ nodes.extract.output.fields.invoice_no }}"
+      carrier_scac: "${{ nodes.extract.output.fields.carrier_scac }}"
+      variance_pct: "${{ nodes.match.output.variance_pct }}"
+  - id: after_l3
+    type: rule
+    cases:
+      - when: "nodes.l3.output.status == 'completed'"
+        goto: pay
+    default: rejected
+  - id: pay
+    type: action
+    action: erp.post_payable
+    with:
+      document_id: "${{ input.document_id }}"
+      fields: "${{ nodes.extract.output.fields }}"
+      amount_usd: "${{ nodes.match.output.total_usd }}"
+  - id: dispute
+    type: action
+    action: carrier.dispute_email
+    with:
+      fields: "${{ nodes.extract.output.fields }}"
+      issues: "${{ nodes.match.output.issues }}"
+      clauses: "${{ nodes.match.output.cited_clauses }}"
+      reason: "${{ nodes.l2.output.payload.reason ?? nodes.l1_l2.output.payload.reason ?? nodes.l1.output.payload.reason ?? '' }}"
+  - id: done
+    type: end
+  - id: duplicate
+    type: end
+    status: rejected
+  - id: rejected
+    type: end
+    status: rejected
+  - id: disputed
+    type: end
+    status: rejected
+edges:
+  - {from: extract, to: dedupe}
+  - {from: dedupe, to: dup}
+  - {from: match, to: accessorials}
+  - {from: accessorials, to: approval}
+  - {from: l1, to: pay, on: approved}
+  - {from: l1, to: dispute, on: dispute}
+  - {from: l1, to: rejected, on: rejected}
+  - {from: l1_l2, to: l2, on: approved}
+  - {from: l1_l2, to: dispute, on: dispute}
+  - {from: l1_l2, to: rejected, on: rejected}
+  - {from: l2, to: l3_gate, on: approved}
+  - {from: l3, to: after_l3}
+  - {from: l2, to: dispute, on: dispute}
+  - {from: l2, to: rejected, on: rejected}
+  - {from: pay, to: done}
+  - {from: dispute, to: disputed}

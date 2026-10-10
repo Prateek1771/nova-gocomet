@@ -1,0 +1,26 @@
+{
+  "key": "invoice_review",
+  "title": "Invoice review",
+  "layout": {
+    "type": "split",
+    "children": [
+      {"type": "DocumentViewer", "bind": {"document_id": "$.document_id", "evidence": "$.evidence", "issues": "$.issues"}},
+      {"type": "stack", "children": [
+        {"type": "IssueList", "bind": {"issues": "$.issues", "why": "$.why"}},
+        {"type": "ComparisonTable", "bind": {"matches": "$.matches", "clauses": "$.cited_clauses", "accessorials": "$.accessorials", "fields": "$.fields", "variance_pct": "$.variance_pct", "amount": "$.amount", "level": "$.level"}},
+        {"type": "DecisionBar", "options": ["approved", "dispute", "rejected"], "requireReasonFor": ["dispute", "rejected"]}
+      ]}
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["decision"],
+    "additionalProperties": false,
+    "properties": {
+      "decision": {"enum": ["approved", "dispute", "rejected"]},
+      "reason": {"type": "string", "maxLength": 2000}
+    },
+    "if": {"properties": {"decision": {"enum": ["dispute", "rejected"]}}},
+    "then": {"required": ["decision", "reason"]}
+  }
+}

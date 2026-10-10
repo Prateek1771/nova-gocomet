@@ -230,3 +230,56 @@ The approver set is the assigned role plus every role with an equal or higher li
 - **Trace links:** `run_steps.trace_id` is written from the activity's span. The run page links the run's trace in Jaeger and, when `LANGFUSE_URL` is set, its LLM calls in Langfuse.
 **Alternatives.** The LiteLLM Langfuse callback: it sees only the gateway's call, not the run, and needs Langfuse keys in the gateway. A separate ClickHouse for Langfuse: about 1 GB more RAM.
 **Consequences.** The `ai` profile adds about 2.5 GB including ClickHouse. One trace per run spans API, workflow, activities, SQL and LLM calls; Jaeger shows all of it, and Langfuse the generations. Langfuse being down only backs up the collector's retry queue, and core keeps working.
+
+## ADR-030: Weaviate in `core`, our own vectors from `nova-embed`, plain httpx
+
+**Context.** W2 needs rate-contract clause search (docs/04 W2), and FR-4.3 asks for Weaviate tenants. The HLD put Weaviate in the `ai` profile, but W2 must run on a plain `make up`.
+**Decision.** Weaviate 1.32 joins `core` (port 8090, about 300 MB).
+- **Collection:** one, `ContractClause`, with native multi-tenancy (one Weaviate tenant per Nova tenant id) and `vectorizer: none`.
+- **Vectors:** we bring them from the `nova-embed` alias (host Ollama nomic-embed-text, 768-dim), with ADR-015's `search_document:` / `search_query:` prefixes.
+- **Client:** `nova_core.vectors` speaks REST + GraphQL over httpx, with no SDK.
+- **Search:** hybrid (BM25 + vector, alpha 0.5), filtered by carrier.
+- **Indexing:** idempotent, with ids derived from tenant + clause id. It runs in the API's startup task (retrying while the embedder comes up) and as `make reindex`.
+**Alternatives.** The `ai` profile: W2 wouldn't run without it. pgvector: one store fewer, but no hybrid BM25 and no per-tenant shards. The Weaviate SDK: a large dependency for four calls.
+**Consequences.**
+- Tenant isolation holds at the shard level; an integration test shows another tenant's clause can't match.
+- A model change means a reindex: `embed_model` per collection is still to add when a second model appears.
+- Retrieval quality depends on the embedder being up. Indexing retries, and the matcher fails retryably (then needs_attention) if Weaviate or the embedder is down.
+
+## ADR-031: Dwell facts from Postgres `container_events` until M6
+
+**Context.** W2's accessorial check needs dwell facts (gate-out → gate-in). The design puts shipment events in ClickHouse via Kafka, which lands in M6.
+**Decision.** M5 seeds a Postgres `container_events` table (RLS) and reads it through one function, `invoices.dwell_days(events, container)`. Free time is a property of the rate contract (`free_time_days`). Chargeable days are started days out minus free days, so a container out 3 d 7 h with 5 free days gives 4 days out and 0 chargeable. The matcher flags `DET_NOT_SUPPORTED` deterministically, and the `decide` node judges the accessorial facts as the residue (rule 3).
+**Alternatives.** Pull ClickHouse and the event pipeline into M5: M6's whole data layer ahead of time. Ask the model to read events: violates rule 3.
+**Consequences.** M6 swaps the source of `dwell_days` to the ClickHouse `dwell_time_hours` metric with the same contract. Until then, events are seed data, not a live feed.
+
+## ADR-032: W2 build decisions
+
+**Context.** docs/04 W2 fixed the graph and the approval matrix, but not the data contracts, the duplicate mechanics, citation trust, or what "wrong currency" does.
+**Decision.**
+- **Duplicate:** a deterministic agent `invoice_dedupe` (no model), placed before the matcher as in the diagram, finds an earlier document's extraction with the same carrier + invoice number. Identical bytes were already deduplicated at upload, and a duplicate run makes exactly one model call (extraction), which an integration test asserts.
+- **Grounded citations:** Weaviate returns candidates per line, and one `nova-reason` call per invoice picks a clause per line. Code keeps a pick only if it is among that line's candidates and for the same charge code, and the rate always comes from the clause row in Postgres, never the model. An ungrounded pick becomes `NO_CONTRACT_RATE`.
+- **Matcher checks:** `RATE_OVER_CONTRACT` (high, > 0.5% over the cited rate, after FX), `CURRENCY_MISMATCH` (high), `DET_NOT_SUPPORTED` (high), `LINE_NOT_ON_PO` / `QTY_MISMATCH` / `NO_CONTRACT_RATE` (medium), `PO_NOT_FOUND` / `NO_CONTRACT` / `FX_UNKNOWN` (high). Variance compares the invoice in USD with qty × contract rate.
+- **Routing (approval rule):** any high finding, an unjustified accessorial, total > `invoice.l2_limit_usd` or variance > `invoice.l2_variance_pct` → L1 then L2. Otherwise, variance ≤ auto % and total ≤ auto limit → pay; else L1 only. So wrong currency goes to two levels.
+  - L1-only and L1→L2 are separate task nodes, so the graph reads like the spec.
+  - Every review task carries `amount`, so OpenFGA `within_limit` applies. An L1 above the ops lead's limit is taken by a higher-limit role (demo step 8: the ops lead gets a 403).
+  - Bolt adds `controller_signoff` as a subflow after L2 when the total is above its L2 limit, and branches on the child's status.
+- **Actions:**
+  - `erp.post_payable` upserts `invoices` with status `posted`, unique per carrier + number.
+  - `carrier.dispute_email` writes an `email.dispute` row to the outbox whose body quotes each disputed line's clause and the reviewer's reason (a dispute requires a reason, in `invoice_review`'s output_schema).
+- **Extractor:** prompt hints and evidence rules moved into each schema (`x-nova-prompt`, `x-nova-evidence`), so the extractor holds no BoL-specific text.
+- **Config:** the seed adds keys a milestone introduces (`invoice.*`) as a new TenantConfig version when the latest lacks them, never overwriting admin edits.
+**Consequences.** All 8 cases route as specified for both tenants (unit routing on the real YAML rules, plus end to end on real Postgres, Weaviate, Temporal and OpenFGA). FX rates are seeded per tenant (`fx_rates`); a live FX feed is out of scope.
+
+## ADR-033: `LLM_MODE=openai` for paid-quality testing
+
+**Context.** `free` (ADR-025) is $0 but rate-limited. Its free vision models are weak, and because every model costs $0, LiteLLM skips budget checks (ADR-028), so the per-tenant budget stop can't be shown live. An OpenAI key is now available for testing.
+**Decision.** A fifth gateway config, `infra/litellm/config.openai.yaml`:
+- every chat alias (`nova-extract-text`, `nova-extract-vision`, `nova-reason`, `nova-decide`) → `gpt-4.1-mini`, which also reads images; `nova-decide-fallback` → Groq gpt-oss-120b
+- not `gpt-4.1-nano` for decide: it scored 0.80 on the decide eval, under the 0.85 gate
+- `nova-embed` stays on Ollama nomic-embed-text, because a new embedder means a reindex
+- fallbacks to the free Groq / OpenRouter deployments; Redis cache; a gateway `max_budget` of 5 USD
+- per-tenant virtual keys and budgets apply as in every mode
+
+Code still names only aliases (rule 6). Jev's decisions API is reached only in `cheap`/`demo`, so `decide` uses the chat aliases here. The mode is chosen per run (`LLM_MODE=openai docker compose …`); `free` stays the dev default.
+**Consequences.** Real cost per run shows in the UI and Langfuse, and the budget stop degrades to a needs_attention task live. Cost is about $0.001–0.003 per document at gpt-4.1-mini prices. Prompts go to OpenAI, so this mode is for synthetic documents only, like `free`. Moving to a more literal model exposed vague prompts (decide criteria) and a brittle contract (echoing `§` clause ids). The fixes are model-agnostic: criteria name the exact fields and cases, and the matcher picks a retrieved candidate by number.

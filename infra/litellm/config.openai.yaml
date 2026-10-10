@@ -1,0 +1,40 @@
+# LLM_MODE=openai (ADR-033): paid-quality testing on OpenAI. gpt-4.1-mini reads text and images (so scanned
+# pages need no OpenRouter) and answers decide (nano scored 0.80 on the decide eval, under the 0.85 gate). Real per-token prices, so per-tenant budgets
+# (ADR-028) are enforced here, unlike `free` where LiteLLM skips budget checks for $0 models.
+# Embeddings stay on Ollama nomic-embed-text: changing the embedder means a reindex (ADR-015).
+# On provider errors the free Groq / OpenRouter deployments take over. `free` stays the dev default.
+x-openai: &openai {api_key: os.environ/OPENAI_API_KEY}
+x-groq: &groq {api_key: os.environ/GROQ_API_KEY, rpm: 30, input_cost_per_token: 0, output_cost_per_token: 0}
+x-or: &or {api_key: os.environ/OPENROUTER_API_KEY}
+model_list:
+  - model_name: nova-extract-text
+    litellm_params: {<<: *openai, model: openai/gpt-4.1-mini}
+  - model_name: nova-extract-vision
+    litellm_params: {<<: *openai, model: openai/gpt-4.1-mini}
+  - model_name: nova-reason
+    litellm_params: {<<: *openai, model: openai/gpt-4.1-mini}
+  - model_name: nova-decide
+    litellm_params: {<<: *openai, model: openai/gpt-4.1-mini}
+  - model_name: nova-decide-fallback
+    litellm_params: {<<: *groq, model: groq/openai/gpt-oss-120b, reasoning_effort: low}
+  - model_name: nova-embed
+    litellm_params: {model: ollama/nomic-embed-text, api_base: http://host.docker.internal:11434}
+  # fallback deployments (never named by code)
+  - model_name: free-text
+    litellm_params: {<<: *groq, model: groq/openai/gpt-oss-120b, reasoning_effort: low}
+  - model_name: free-any
+    litellm_params: {<<: *or, model: openrouter/openrouter/free}
+litellm_settings:
+  drop_params: true
+  num_retries: 2
+  fallbacks:
+    - nova-extract-text: [free-text, free-any]
+    - nova-reason: [free-text, free-any]
+    - nova-decide: [nova-decide-fallback, free-any]
+    - nova-extract-vision: [free-any]
+  cache: true
+  cache_params: {type: redis, host: redis, port: 6379, ttl: 604800}
+  max_budget: 5                 # USD, whole gateway; per-tenant virtual keys cap each tenant below this
+  budget_duration: 30d
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

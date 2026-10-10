@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Check, Loader2, RotateCcw, X } from "lucide-react";
+import { Ban, Check, Loader2, MessageSquareWarning, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,7 +12,8 @@ import { useTaskApp } from "./context";
 
 /** How each engine outcome is shown. Unknown outcomes still render (the engine validates them). */
 const OUTCOMES: Record<string, { label: string; icon: ReactNode; key?: string; primary?: boolean; danger?: boolean }> = {
-  approved: { label: "Approve & push", icon: <Check className="size-4" />, key: "a", primary: true },
+  approved: { label: "Approve", icon: <Check className="size-4" />, key: "a", primary: true },
+  dispute: { label: "Dispute", icon: <MessageSquareWarning className="size-4" />, key: "d", danger: true },
   rejected: { label: "Reject", icon: <X className="size-4" />, key: "r", danger: true },
   retry: { label: "Retry step", icon: <RotateCcw className="size-4" />, primary: true },
   abort: { label: "Abort run", icon: <Ban className="size-4" />, danger: true },
@@ -20,7 +21,18 @@ const OUTCOMES: Record<string, { label: string; icon: ReactNode; key?: string; p
 
 /** Decide a task. Claims first when needed (the engine only accepts completion from the claimer);
  * the server validates the output against the app's output_schema, so errors are shown verbatim. */
-export function DecisionBar({ options = ["approved", "rejected"], requireReasonFor = [] }: { options?: string[]; requireReasonFor?: string[] }) {
+export function DecisionBar({
+  options = ["approved", "rejected"],
+  requireReasonFor = [],
+  sendsFields: editable = false,
+  approveLabel,
+}: {
+  options?: string[];
+  requireReasonFor?: string[];
+  /** the app edits fields (FieldForm) and an approval carries them downstream (bol_review) */
+  sendsFields?: boolean;
+  approveLabel?: string;
+}) {
   const { task, me, fields, edited } = useTaskApp();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -30,7 +42,7 @@ export function DecisionBar({ options = ["approved", "rejected"], requireReasonF
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const done = task.status === "done";
   const claimedByOther = task.status === "claimed" && task.assignee_user && task.assignee_user !== me;
-  const sendsFields = options.includes("approved") && Object.keys(fields).length > 0;
+  const sendsFields = editable && options.includes("approved") && Object.keys(fields).length > 0;
 
   const submit = useCallback(
     async (decision: string) => {
@@ -87,12 +99,13 @@ export function DecisionBar({ options = ["approved", "rejected"], requireReasonF
       )}
       <div className="flex items-center gap-2">
         <span className="mr-auto text-xs text-muted">
-          {sendsFields ? (edited.size ? `${edited.size} field edit${edited.size > 1 ? "s" : ""} will be sent to the TMS` : "Fields go to the TMS as extracted") : ""}
+          {sendsFields ? (edited.size ? `${edited.size} field edit${edited.size > 1 ? "s" : ""} go with the approval` : "Fields go as extracted") : ""}
         </span>
         {[...options]
           .sort((a, b) => Number(!!OUTCOMES[a]?.primary) - Number(!!OUTCOMES[b]?.primary)) // primary last (right)
           .map((o) => {
-            const m = OUTCOMES[o] ?? { label: o.replaceAll("_", " "), icon: null };
+            const base = OUTCOMES[o] ?? { label: o.replaceAll("_", " "), icon: null };
+            const m = o === "approved" && approveLabel ? { ...base, label: approveLabel } : base;
             return (
               <button
                 key={o}

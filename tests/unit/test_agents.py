@@ -80,7 +80,7 @@ def test_reformatted_values_still_find_their_box() -> None:
 def test_ground_truth_is_found_on_the_generated_pdf(case: dict[str, Any]) -> None:
     words, texts, scans = read_pdf(gen_bols.render(case))
     assert not scans and texts
-    confidence, evidence = evidence_for(case["fields"], words, scans)
+    confidence, evidence = evidence_for(case["fields"], words, scans, load_schema("bol_v1"))
     low = {k: v for k, v in confidence.items() if v < 0.85}
     assert not low, low  # clean extractions must clear the W1 review threshold
     assert all(e["bbox"] and e["page"] == 1 for e in evidence)
@@ -90,7 +90,7 @@ def test_scan_has_no_text_layer_and_caps_confidence() -> None:
     case = next(c for c in CASES if c["scan"])
     words, _, scans = read_pdf(gen_bols.scan(gen_bols.render(case)))
     assert not words and scans == [1]
-    confidence, evidence = evidence_for(case["fields"], words, scans)
+    confidence, evidence = evidence_for(case["fields"], words, scans, load_schema("bol_v1"))
     assert max(confidence.values()) <= 0.6 and all(e["bbox"] is None for e in evidence)
 
 
