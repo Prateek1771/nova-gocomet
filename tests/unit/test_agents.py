@@ -147,7 +147,10 @@ async def test_decide_gives_up_to_a_human() -> None:
         await decide(Q, {})
 
 
-async def test_budget_exhausted_is_not_retried_or_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("status", [400, 422, 429])
+async def test_budget_exhausted_is_not_retried_or_swallowed(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
     """ADR-028: calls go out with the tenant's derived key; LiteLLM's budget error becomes
     BudgetExceeded and skips the decide fallbacks (they bill the same key)."""
     from nova_core.settings import get_settings
@@ -158,7 +161,7 @@ async def test_budget_exhausted_is_not_retried_or_swallowed(monkeypatch: pytest.
     def handler(req: httpx.Request) -> httpx.Response:
         seen.append(req.headers["authorization"])
         msg = "ExceededBudget: Budget has been exceeded! Current cost: 2.01, Max budget: 2.0"
-        return httpx.Response(400, json={"error": {"message": msg, "type": "budget_exceeded"}})
+        return httpx.Response(status, json={"error": {"message": msg, "type": "budget_exceeded"}})
 
     llm.use(llm.LLM(transport=httpx.MockTransport(handler)))
     with pytest.raises(llm.BudgetExceeded):

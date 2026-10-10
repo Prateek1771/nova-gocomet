@@ -33,6 +33,7 @@ class Word:
     x1: float
     bottom: float
     page: int  # 1-based
+    conf: float = 1.0  # OCR confidence; text-layer words are exact
 
 
 @dataclass
@@ -41,6 +42,7 @@ class Match:
     bbox: list[float]
     text: str
     score: float  # 0..1
+    conf: float = 1.0  # lowest OCR confidence among the matched words
 
 
 def norm(s: str) -> str:
@@ -74,6 +76,10 @@ def _union(ws: list[Word]) -> list[float]:
     ]
 
 
+def _conf(ws: list[Word]) -> float:
+    return min(w.conf for w in ws)
+
+
 def _windows(words: list[Word], n: int) -> Any:
     for i in range(len(words)):
         win = words[i : i + n]
@@ -92,7 +98,7 @@ def locate(value: Any, words: list[Word]) -> Match | None:
         for w in words:
             n = as_number(w.text)
             if n is not None and abs(n - num) < 0.01:
-                return Match(w.page, _union([w]), w.text, 1.0)
+                return Match(w.page, _union([w]), w.text, 1.0, w.conf)
         return None
     s = str(value)
     if _ISO.match(s):
@@ -100,7 +106,7 @@ def locate(value: Any, words: list[Word]) -> Match | None:
         for n in (1, 2, 3):
             for win in _windows(words, n):
                 if as_date(" ".join(w.text for w in win)) == d:
-                    return Match(win[0].page, _union(win), " ".join(w.text for w in win), 1.0)
+                    return Match(win[0].page, _union(win), " ".join(w.text for w in win), 1.0, _conf(win))
     target = norm(s)
     if not target:
         return None
@@ -115,4 +121,42 @@ def locate(value: Any, words: list[Word]) -> Match | None:
                     break
     if best is None or best[0] < 60:
         return None
-    return Match(best[1][0].page, _union(best[1]), " ".join(w.text for w in best[1]), round(best[0] / 100, 3))
+    win = best[1]
+    return Match(win[0].page, _union(win), " ".join(w.text for w in win), round(best[0] / 100, 3), _conf(win))
+
+
+_ANCHOR = re.compile(r"<a id=['\"][^'\"]*['\"]></a>")
+_ROW_END = re.compile(r"</tr>|<br\s*/?>", re.IGNORECASE)
+_TAG = re.compile(r"<[^>]+>")
+
+
+def chunk_text(markdown: str) -> str:
+    """A DPT-2 chunk's markdown as plain text: no anchors, table rows as lines, cells space-separated."""
+    return _TAG.sub(" ", _ROW_END.sub("\n", _ANCHOR.sub("", markdown)))
+
+
+def chunk_words(
+    chunks: list[dict[str, Any]], grounding: dict[str, Any], sizes: dict[int, tuple[float, float]]
+) -> list[Word]:
+    """DPT-2 chunks -> word boxes in PDF points for the pages in `sizes` (1-based -> (width, height)).
+    A word inside one of the chunk's `low_confidence_spans` carries that span's confidence.
+    ponytail: a chunk only has one box, so it is split evenly by line and by character offset; boxes
+    are approximate within a chunk. Use word-level grounding if ADE starts returning it."""
+    out: list[Word] = []
+    for ch in chunks:
+        g = ch.get("grounding") or {}
+        page = int(g.get("page") or 0) + 1
+        if page not in sizes or not g.get("box"):
+            continue
+        b, (pw, ph) = g["box"], sizes[page]
+        x0, y0, x1, y1 = b["left"] * pw, b["top"] * ph, b["right"] * pw, b["bottom"] * ph
+        spans = (grounding.get(str(ch.get("id"))) or {}).get("low_confidence_spans") or []
+        lines = [ln for ln in chunk_text(ch.get("markdown") or "").splitlines() if ln.strip()]
+        lh = (y1 - y0) / max(len(lines), 1)
+        for i, ln in enumerate(lines):
+            top, per_char = y0 + i * lh, (x1 - x0) / max(len(ln), 1)
+            for m in re.finditer(r"\S+", ln):
+                low = [float(sp["confidence"]) for sp in spans if m.group() in str(sp.get("text"))]
+                left, right = x0 + per_char * m.start(), x0 + per_char * m.end()
+                out.append(Word(m.group(), left, top, right, top + lh, page, min(low, default=1.0)))
+    return out

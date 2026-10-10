@@ -1,0 +1,544 @@
+{
+ "markdown": "<a id='f72f9783-85a6-4f78-af9c-552faa6fd105'></a>\n\nBILL OF LADING\nShipped on board in apparent good order and condition - non negotiable copy\n\nCMA CGM\nSCAC: CMDU\n\n<a id='28850576-5d12-4ae8-9608-1662a800e736'></a>\n\n| B/L NO. | BOOKING REF. |\n| :--- | :--- |\n| CMDU2609170 | BKG770110 |\n\nSHIPPER\n\nNingbo Autoparts Manufacturing Ltd.\n66 Beilun Road, Ningbo 315800, China.\n\n<a id='2cf61876-f3ab-4451-b3b7-9c99d528f70d'></a>\n\nCONSIGNEE\n\nFelixstowe Motor Spares Ltd.\n\nDock Road, Felixstowe IP11 3QW, United Kingdom\n\n<a id='058d3ee6-da87-42c0-b3a0-b4db9dc366af'></a>\n\nNOTIFY PARTY:\nFelixstowe Motor Spares Ltd.\nDock Road, Felixstowe IP11 3QW, United Kingdom\n\n<a id='142e28b7-b1e2-4be9-95ed-6f7badf3dbbb'></a>\n\n| VESSEL | VOYAGE NO. | FREIGHT |\n| :--- | :--- | :--- |\n| CMA CGM JACQUES SAADE | 0MX4LW1MA | FREIGHT COLLECT |\n\n<a id='f9f56878-b691-4e85-936e-973050fea90c'></a>\n\n| PORT OF LOADING | PORT OF DISCHARGE |\n| :--- | :--- |\n| CNNGB - Ningbo | GBFXT - Felixstowe |\n\n<a id='4e269c83-19b6-40ce-b1dd-e55cba43e35f'></a>\n\n<table id=\"0-1\">\n<tr><td id=\"0-2\">Container No.</td><td id=\"0-3\">Seal No.</td><td id=\"0-4\">Pkgs Description of Goods</td><td id=\"0-5\">HS Code</td><td id=\"0-6\">Gross Wt (kg)</td></tr>\n<tr><td id=\"0-7\">[ILLEGIBLE_TEXT]</td><td id=\"0-8\">SL870530</td><td id=\"0-9\">250 Photovoltaic solar panels</td><td id=\"0-a\">854143</td><td id=\"0-b\">6,250.0</td></tr>\n<tr><td id=\"0-c\">CMAU1742816</td><td id=\"0-d\">SL870537</td><td id=\"0-e\">250 Photovoltaic solar panels</td><td id=\"0-f\">854143</td><td id=\"0-g\">6,250.0</td></tr>\n</table>\n\n<a id='ad26ca1e-3abb-4989-bd95-db4f553a3940'></a>\n\nTotal packages: 500\nTotal gross weight: 12,500.0 KGS\nPlace and date of issue: Ningbo, 20 SEP 2026",
+ "chunks": [
+  {
+   "markdown": "<a id='f72f9783-85a6-4f78-af9c-552faa6fd105'></a>\n\nBILL OF LADING\nShipped on board in apparent good order and condition - non negotiable copy\n\nCMA CGM\nSCAC: CMDU",
+   "type": "text",
+   "id": "f72f9783-85a6-4f78-af9c-552faa6fd105",
+   "grounding": {
+    "box": {
+     "left": 0.0,
+     "top": 0.0006262660026550293,
+     "right": 0.9891700744628906,
+     "bottom": 0.08856592327356339
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='28850576-5d12-4ae8-9608-1662a800e736'></a>\n\n| B/L NO. | BOOKING REF. |\n| :--- | :--- |\n| CMDU2609170 | BKG770110 |\n\nSHIPPER\n\nNingbo Autoparts Manufacturing Ltd.\n66 Beilun Road, Ningbo 315800, China.",
+   "type": "text",
+   "id": "28850576-5d12-4ae8-9608-1662a800e736",
+   "grounding": {
+    "box": {
+     "left": 0.0507197380065918,
+     "top": 0.08896796405315399,
+     "right": 0.9375330805778503,
+     "bottom": 0.20177890360355377
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='2cf61876-f3ab-4451-b3b7-9c99d528f70d'></a>\n\nCONSIGNEE\n\nFelixstowe Motor Spares Ltd.\n\nDock Road, Felixstowe IP11 3QW, United Kingdom",
+   "type": "text",
+   "id": "2cf61876-f3ab-4451-b3b7-9c99d528f70d",
+   "grounding": {
+    "box": {
+     "left": 0.05458962917327881,
+     "top": 0.19971737265586853,
+     "right": 0.9358780980110168,
+     "bottom": 0.2610073685646057
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='058d3ee6-da87-42c0-b3a0-b4db9dc366af'></a>\n\nNOTIFY PARTY:\nFelixstowe Motor Spares Ltd.\nDock Road, Felixstowe IP11 3QW, United Kingdom",
+   "type": "text",
+   "id": "058d3ee6-da87-42c0-b3a0-b4db9dc366af",
+   "grounding": {
+    "box": {
+     "left": 0.055852025747299194,
+     "top": 0.2586524486541748,
+     "right": 0.9366400241851807,
+     "bottom": 0.32193827629089355
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='142e28b7-b1e2-4be9-95ed-6f7badf3dbbb'></a>\n\n| VESSEL | VOYAGE NO. | FREIGHT |\n| :--- | :--- | :--- |\n| CMA CGM JACQUES SAADE | 0MX4LW1MA | FREIGHT COLLECT |",
+   "type": "text",
+   "id": "142e28b7-b1e2-4be9-95ed-6f7badf3dbbb",
+   "grounding": {
+    "box": {
+     "left": 0.05792081356048584,
+     "top": 0.32074806094169617,
+     "right": 0.9366084933280945,
+     "bottom": 0.3688379228115082
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='f9f56878-b691-4e85-936e-973050fea90c'></a>\n\n| PORT OF LOADING | PORT OF DISCHARGE |\n| :--- | :--- |\n| CNNGB - Ningbo | GBFXT - Felixstowe |",
+   "type": "text",
+   "id": "f9f56878-b691-4e85-936e-973050fea90c",
+   "grounding": {
+    "box": {
+     "left": 0.0601922869682312,
+     "top": 0.36838671565055847,
+     "right": 0.9378916621208191,
+     "bottom": 0.41757360100746155
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='4e269c83-19b6-40ce-b1dd-e55cba43e35f'></a>\n\n<table id=\"0-1\">\n<tr><td id=\"0-2\">Container No.</td><td id=\"0-3\">Seal No.</td><td id=\"0-4\">Pkgs Description of Goods</td><td id=\"0-5\">HS Code</td><td id=\"0-6\">Gross Wt (kg)</td></tr>\n<tr><td id=\"0-7\">[ILLEGIBLE_TEXT]</td><td id=\"0-8\">SL870530</td><td id=\"0-9\">250 Photovoltaic solar panels</td><td id=\"0-a\">854143</td><td id=\"0-b\">6,250.0</td></tr>\n<tr><td id=\"0-c\">CMAU1742816</td><td id=\"0-d\">SL870537</td><td id=\"0-e\">250 Photovoltaic solar panels</td><td id=\"0-f\">854143</td><td id=\"0-g\">6,250.0</td></tr>\n</table>",
+   "type": "table",
+   "id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f",
+   "grounding": {
+    "box": {
+     "left": 0.061497896909713745,
+     "top": 0.4204004108905792,
+     "right": 0.9395065307617188,
+     "bottom": 0.48870357871055603
+    },
+    "page": 0
+   }
+  },
+  {
+   "markdown": "<a id='ad26ca1e-3abb-4989-bd95-db4f553a3940'></a>\n\nTotal packages: 500\nTotal gross weight: 12,500.0 KGS\nPlace and date of issue: Ningbo, 20 SEP 2026",
+   "type": "text",
+   "id": "ad26ca1e-3abb-4989-bd95-db4f553a3940",
+   "grounding": {
+    "box": {
+     "left": 0.059103310108184814,
+     "top": 0.4892061650753021,
+     "right": 0.6485450863838196,
+     "bottom": 0.5382471680641174
+    },
+    "page": 0
+   }
+  }
+ ],
+ "grounding": {
+  "0-1": {
+   "box": {
+    "left": 0.06918241781896006,
+    "top": 0.4220113383734353,
+    "right": 0.9306071849945088,
+    "bottom": 0.48711493677294015
+   },
+   "page": 0,
+   "type": "table",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "0-2": {
+   "box": {
+    "left": 0.0692799769013681,
+    "top": 0.4294529542319289,
+    "right": 0.17874590473381471,
+    "bottom": 0.44838547512758914
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 0,
+    "col": 0,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-3": {
+   "box": {
+    "left": 0.1787277270101884,
+    "top": 0.42850990989889626,
+    "right": 0.2738844394656955,
+    "bottom": 0.44729826701374414
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 0,
+    "col": 1,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-4": {
+   "box": {
+    "left": 0.27385509501284744,
+    "top": 0.4257723587118649,
+    "right": 0.5499463323236915,
+    "bottom": 0.4463530200829887
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 0,
+    "col": 2,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-5": {
+   "box": {
+    "left": 0.5492952555850976,
+    "top": 0.4236909035736411,
+    "right": 0.7598680781677976,
+    "bottom": 0.44361720437523794
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 0,
+    "col": 3,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-6": {
+   "box": {
+    "left": 0.7591771047989493,
+    "top": 0.4220113383734353,
+    "right": 0.9296807619910941,
+    "bottom": 0.4415323259817834
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 0,
+    "col": 4,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-7": {
+   "box": {
+    "left": 0.06923303360767553,
+    "top": 0.44729826701374414,
+    "right": 0.1787277270101884,
+    "bottom": 0.4670212438094657
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 1,
+    "col": 0,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-8": {
+   "box": {
+    "left": 0.17870868208177307,
+    "top": 0.4463530200829887,
+    "right": 0.2739152743185427,
+    "bottom": 0.4659949262580617
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 1,
+    "col": 1,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-9": {
+   "box": {
+    "left": 0.2738844394656955,
+    "top": 0.44361720437523794,
+    "right": 0.5492952555850976,
+    "bottom": 0.4651023789383254
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 1,
+    "col": 2,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-a": {
+   "box": {
+    "left": 0.5486053163422129,
+    "top": 0.4415323259817834,
+    "right": 0.7591771047989493,
+    "bottom": 0.46252720157921173
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 1,
+    "col": 3,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-b": {
+   "box": {
+    "left": 0.7584401883394071,
+    "top": 0.4398386140566388,
+    "right": 0.9301341219426944,
+    "bottom": 0.4605600315735618
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 1,
+    "col": 4,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-c": {
+   "box": {
+    "left": 0.06918241781896006,
+    "top": 0.4659949262580617,
+    "right": 0.17870868208177307,
+    "bottom": 0.48711493677294015
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 2,
+    "col": 0,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-d": {
+   "box": {
+    "left": 0.17868823333782058,
+    "top": 0.4651023789383254,
+    "right": 0.27394826153055857,
+    "bottom": 0.48606972986539865
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 2,
+    "col": 1,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-e": {
+   "box": {
+    "left": 0.2739152743185427,
+    "top": 0.46252720157921173,
+    "right": 0.5486053163422129,
+    "bottom": 0.48516049560228774
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 2,
+    "col": 2,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-f": {
+   "box": {
+    "left": 0.5478749245394176,
+    "top": 0.4605600315735618,
+    "right": 0.7584401883394071,
+    "bottom": 0.4825459308964768
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 2,
+    "col": 3,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "0-g": {
+   "box": {
+    "left": 0.7576662556432262,
+    "top": 0.4589504270634928,
+    "right": 0.9306071849945088,
+    "bottom": 0.48054352264653083
+   },
+   "page": 0,
+   "type": "tableCell",
+   "confidence": null,
+   "position": {
+    "row": 2,
+    "col": 4,
+    "rowspan": 1,
+    "colspan": 1,
+    "chunk_id": "4e269c83-19b6-40ce-b1dd-e55cba43e35f"
+   }
+  },
+  "058d3ee6-da87-42c0-b3a0-b4db9dc366af": {
+   "box": {
+    "left": 0.055852025747299194,
+    "top": 0.2586524486541748,
+    "right": 0.9366400241851807,
+    "bottom": 0.32193827629089355
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "142e28b7-b1e2-4be9-95ed-6f7badf3dbbb": {
+   "box": {
+    "left": 0.05792081356048584,
+    "top": 0.32074806094169617,
+    "right": 0.9366084933280945,
+    "bottom": 0.3688379228115082
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "28850576-5d12-4ae8-9608-1662a800e736": {
+   "box": {
+    "left": 0.0507197380065918,
+    "top": 0.08896796405315399,
+    "right": 0.9375330805778503,
+    "bottom": 0.20177890360355377
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "2cf61876-f3ab-4451-b3b7-9c99d528f70d": {
+   "box": {
+    "left": 0.05458962917327881,
+    "top": 0.19971737265586853,
+    "right": 0.9358780980110168,
+    "bottom": 0.2610073685646057
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "4e269c83-19b6-40ce-b1dd-e55cba43e35f": {
+   "box": {
+    "left": 0.061497896909713745,
+    "top": 0.4204004108905792,
+    "right": 0.9395065307617188,
+    "bottom": 0.48870357871055603
+   },
+   "page": 0,
+   "type": "chunkTable",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "ad26ca1e-3abb-4989-bd95-db4f553a3940": {
+   "box": {
+    "left": 0.059103310108184814,
+    "top": 0.4892061650753021,
+    "right": 0.6485450863838196,
+    "bottom": 0.5382471680641174
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "f72f9783-85a6-4f78-af9c-552faa6fd105": {
+   "box": {
+    "left": 0.0,
+    "top": 0.0006262660026550293,
+    "right": 0.9891700744628906,
+    "bottom": 0.08856592327356339
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  },
+  "f9f56878-b691-4e85-936e-973050fea90c": {
+   "box": {
+    "left": 0.0601922869682312,
+    "top": 0.36838671565055847,
+    "right": 0.9378916621208191,
+    "bottom": 0.41757360100746155
+   },
+   "page": 0,
+   "type": "chunkText",
+   "confidence": null,
+   "low_confidence_spans": []
+  }
+ },
+ "extraction": {
+  "bol_number": "CMDU2609170",
+  "booking_ref": "BKG770110",
+  "cargo_lines": [
+   {
+    "description": "250 Photovoltaic solar panels",
+    "hs_code": "854143",
+    "packages": 250,
+    "weight_kg": 6250.0
+   },
+   {
+    "description": "250 Photovoltaic solar panels",
+    "hs_code": "854143",
+    "packages": 250,
+    "weight_kg": 6250.0
+   }
+  ],
+  "carrier_scac": "CMDU",
+  "consignee": "Felixstowe Motor Spares Ltd.\n\nDock Road, Felixstowe IP11 3QW, United Kingdom",
+  "container_numbers": [
+   "CMAU1742816"
+  ],
+  "description_of_goods": "Photovoltaic solar panels",
+  "freight_terms": "collect",
+  "gross_weight_kg": 12500.0,
+  "hs_codes": [
+   "854143",
+   "854143"
+  ],
+  "issue_date": "2026-09-20",
+  "notify_party": "Felixstowe Motor Spares Ltd.\nDock Road, Felixstowe IP11 3QW, United Kingdom",
+  "package_count": 500,
+  "pod": "GBFXT",
+  "pol": "CNNGB",
+  "seal_numbers": [
+   "SL870530",
+   "SL870537"
+  ],
+  "shipper": "Ningbo Autoparts Manufacturing Ltd.\n66 Beilun Road, Ningbo 315800, China.",
+  "vessel": "CMA CGM JACQUES SAADE",
+  "voyage": "0MX4LW1MA"
+ },
+ "versions": [
+  "dpt-2-20260903",
+  "extract-20260903"
+ ],
+ "credits": 4.3
+}

@@ -283,3 +283,24 @@ The approver set is the assigned role plus every role with an equal or higher li
 
 Code still names only aliases (rule 6). Jev's decisions API is reached only in `cheap`/`demo`, so `decide` uses the chat aliases here. The mode is chosen per run (`LLM_MODE=openai docker compose …`); `free` stays the dev default.
 **Consequences.** Real cost per run shows in the UI and Langfuse, and the budget stop degrades to a needs_attention task live. Cost is about $0.001–0.003 per document at gpt-4.1-mini prices. Prompts go to OpenAI, so this mode is for synthetic documents only, like `free`. Moving to a more literal model exposed vague prompts (decide criteria) and a brittle contract (echoing `§` clause ids). The fixes are model-agnostic: criteria name the exact fields and cases, and the matcher picks a retrieved candidate by number.
+
+## ADR-034: LandingAI DPT-2 for scanned documents, behind the gateway
+
+**Context.** Pages without a text layer went to a multimodal chat model (`nova-extract-vision`, ADR-016). That gave no word boxes (no highlights on scans), a flat 0.6 confidence cap (ADR-022: every scan reached a human) and slow, flaky free vision models (about 9 min for one scan in the free eval). ADR-011 kept DPT-2 (LandingAI ADE) as the optional extractor. Every model call goes through LiteLLM (budgets, tenant keys, Langfuse), and LiteLLM has no LandingAI provider.
+**Decision.**
+- A new alias `nova-extract-scan`, served by a LiteLLM custom provider (`infra/litellm/ade_handler.py`, `custom_provider_map`). It runs DPT-2 Parse (`dpt-2-20260903`, pinned), then ADE Extract with the document's JSON schema (our `x-nova-*` hints and `$` keys stripped), and returns `{markdown, chunks, grounding, extraction, versions, credits}`.
+- Services name only the alias (rule 6) and the LandingAI key lives only in the gateway (`DPT_LANDING_API_KEY`).
+- Usage is reported as `completion_tokens = credits × 1000`, priced at $0.01 per 1000 in the config, so the gateway books $0.01 per ADE credit on the tenant's virtual key. Because the price is non-zero, budgets apply in every mode, `free` included.
+- `num_retries: 0`, so a failed call isn't retried and billed for a second parse. The alias is in free/openai/cheap/demo; `local` stays offline.
+- `doc_extractor`: a document with any scanned page goes to `nova-extract-scan`.
+  - DPT-2 chunk boxes (normalised, top-left) become word boxes in PDF points (`matching.chunk_words`), so evidence and confidence come from the same value matching as text PDFs. Words inside `low_confidence_spans` carry that confidence.
+  - An extraction that fails our schema is redone by `nova-extract-text` over the DPT-2 text.
+  - On any other gateway error (alias absent, provider down) the extractor falls back to the vision path, with a `note` on the output. `BudgetExceeded` is not swallowed.
+  - Text-layer PDFs are unchanged.
+- Scans are trusted on evidence; the ADR-022 cap now applies only to the vision fallback. The planted scan (`bol_10`) carries an ink stain over a container number. DPT-2 omits the value rather than guessing, so the BoL shows 1 container against 2 booked, which is `BOOKING_MISMATCH` and a review.
+
+**Consequences.**
+- Scans get real highlights and about 20–35 s per page. They cost about $0.043 per page (3 parse credits + about 1.3 extract credits), cached by the gateway like any response.
+- ADE Extract doesn't use our injection-hardened extraction prompt. Deterministic checks and human tasks still gate every state change (rules 3–4).
+- Table-cell references in Extract's metadata don't resolve in the Parse response, so evidence comes from value matching, not references.
+- Chunk boxes are split evenly by line and character, so highlights are approximate within a chunk. Synthetic documents only, as with every cloud mode.

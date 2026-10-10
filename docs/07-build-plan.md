@@ -293,6 +293,16 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
     - the BoL `material_issue` criteria didn't name HS/description conflicts or date order, so mini answered "not material"; the criteria now name them
     - gpt-4.1-mini mangled `§` when echoing clause ids, so every citation was discarded; the matcher now has the model pick a candidate by number and maps it back in code
     - the detention criteria now name `chargeable_days` explicitly, because the model had compared against free time
+- **Scans via LandingAI DPT-2 (2026-10-10, [ADR-034](06-adrs.md#adr-034-landingai-dpt-2-for-scanned-documents-behind-the-gateway)):**
+  - `nova-extract-scan` is a LiteLLM custom provider (`infra/litellm/ade_handler.py`), so DPT-2 Parse + Extract go through the gateway with tenant keys, budgets and Langfuse.
+  - Live:
+    - eval extraction F1 0.986 (was 0.972), validator 6/6 with 0 false alarms
+    - W1 10/10, W2 16/16
+    - the planted scan (now with an ink stain over a container) reached review via `BOOKING_MISMATCH`, with 20/20 fields boxed on the scan and $0.043 booked by the gateway
+    - a spent tenant budget stops a scan at once ("LLM budget exhausted at 'extract'")
+  - Found and fixed:
+    - LiteLLM answers a spent budget with HTTP 422, which `llm._fail` didn't map to `BudgetExceeded`, so budget stops were retried as generic errors; it now matches the message on any 4xx
+    - a Docker DNS blip made one scan fall back to vision, so the handler retries a connect error once (never billed)
 
 ---
 

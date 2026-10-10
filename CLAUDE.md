@@ -26,7 +26,7 @@ Nova is GoComet's governed AI platform for enterprise logistics. This repo is a 
 3. **Deterministic before probabilistic.** Code checks run first, and only the residue goes to an LLM.
 4. **Agents recommend and never approve.** State changes happen only in the engine (CEL rules, human tasks).
 5. **Tenant isolation in the store.** Every row, key and message carries `tenant_id`. Use Postgres RLS (the app role `nova_app` is not the table owner), ClickHouse row policies, and Weaviate tenants.
-6. **Code names LiteLLM aliases only** (`nova-extract-text`, `nova-extract-vision`, `nova-reason`, `nova-decide`, `nova-embed`), never provider models.
+6. **Code names LiteLLM aliases only** (`nova-extract-text`, `nova-extract-vision`, `nova-extract-scan`, `nova-reason`, `nova-decide`, `nova-embed`), never provider models. Every model call goes through LiteLLM, non-chat services too (LandingAI DPT-2 is a custom provider, ADR-034).
 7. **YAML is canonical.** The graph is a view. Edit through `yaml` `parseDocument()` mutations, never parse→stringify.
 8. **Side effects are idempotent** via `action_executions.idempotency_key`.
 9. **Module boundaries:** `services/*` depend only on `packages/*`, never on each other. `nova_dsl` has no I/O.
@@ -42,6 +42,7 @@ Next.js (App Router) + React 19 + React Flow + shadcn/Tailwind v4 · FastAPI · 
 
 - `LLM_MODE=local|free|cheap|demo`. **`free` is the dev default** ($0: Groq free tier, OpenRouter `:free` fallback; synthetic docs only, ADR-025). `openai` (ADR-033) is paid-quality testing on gpt-4.1-mini/nano, where per-tenant budgets really trip (`LLM_MODE=openai docker compose …`). `cheap`/`demo` are the paid OpenRouter paths for later; use `demo` only for recording the demo.
 - Embeddings use Ollama `nomic-embed-text`.
+- Scanned pages go to LandingAI DPT-2 (`nova-extract-scan`, ~$0.043/page, billed to the tenant's budget in every cloud mode; needs `DPT_LANDING_API_KEY`). Text-layer PDFs never call it.
 - Dev machine: 32 GB RAM, 4-core i5, no GPU, so local models are CPU-only and slow. Tests use recorded LLM responses (VCR); don't add live LLM calls to unit tests.
 
 ## Commands

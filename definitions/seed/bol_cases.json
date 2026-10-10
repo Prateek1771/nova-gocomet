@@ -518,7 +518,7 @@
   {
    "file": "bol_10.pdf",
    "scan": true,
-   "planted": "LOW_CONFIDENCE_SCAN",
+   "planted": "SMUDGED_SCAN",
    "expected_issues": [],
    "expect_review": true,
    "fields": {
@@ -569,7 +569,13 @@
     "pod": "GBFXT",
     "consignee": "Felixstowe Motor Spares Ltd.",
     "booking_date": "2026-09-11"
-   }
+   },
+   "smudge": [
+    "CMAU1733706"
+   ],
+   "review_issues": [
+    "BOOKING_MISMATCH"
+   ]
   }
  ]
 }

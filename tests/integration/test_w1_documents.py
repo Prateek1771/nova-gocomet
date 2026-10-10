@@ -35,12 +35,16 @@ def fake_model(req: httpx.Request) -> httpx.Response:
     body = json.loads(req.content)
     alias, user = body["model"], body["messages"][-1]["content"]
     blob = json.dumps(user)
-    if alias.startswith("nova-extract"):
+    if alias == "nova-extract-scan":  # DPT-2 through the gateway, recorded on the planted scan (ADR-034)
+        answer: Any = json.loads(
+            (ROOT / "tests/fixtures/landingai/bol_10_scan.json").read_text(encoding="utf-8")
+        )
+    elif alias.startswith("nova-extract"):
         if isinstance(user, list) and any(p.get("type") == "image_url" for p in user):
             case = next(c for c in CASES if c["scan"])  # the only image-only document
         else:
             case = next(c for c in CASES if c["fields"]["bol_number"] in blob)
-        answer: Any = case["fields"]
+        answer = case["fields"]
     elif alias == "nova-reason":
         answer = {"consistent": True, "why": "matches"}
     else:  # decide: material iff there are issues to judge
@@ -128,7 +132,7 @@ async def _settled(c: httpx.AsyncClient, run_id: str) -> dict[str, Any]:
 
 def _pdf(case: dict[str, Any]) -> bytes:
     data = gen_bols.render(case)
-    return gen_bols.scan(data) if case["scan"] else data
+    return gen_bols.scan(data, case.get("smudge")) if case["scan"] else data
 
 
 async def test_ten_seed_bols_route_as_specified(w1: dict[str, Any]) -> None:
@@ -151,12 +155,10 @@ async def test_ten_seed_bols_route_as_specified(w1: dict[str, Any]) -> None:
             [task] = run["tasks"]
             full = (await c.get(f"/tasks/{task['id']}")).json()
             codes = sorted({i["code"] for i in full["payload"]["issues"]})
-            assert codes == sorted(case["expected_issues"]), case["file"]
-            if case["expected_issues"]:  # the highlighted evidence points at the offending field's box
-                ev = full["payload"]["issues"][0]["evidence"]
-                assert ev and ev[0]["bbox"] and ev[0]["page"] == 1, (case["file"], ev)
-            else:  # the scan: no issues, routed by confidence
-                assert max(full["payload"]["confidence"].values()) <= 0.6
+            # the scan's printed data is valid; its issue comes from what DPT-2 can read past the stain
+            assert codes == sorted(case.get("review_issues", case["expected_issues"])), case["file"]
+            ev = full["payload"]["issues"][0]["evidence"]  # the highlight points at the offending box
+            assert ev and ev[0]["bbox"] and ev[0]["page"] == 1, (case["file"], ev)
             reviewed.append((case, task["id"]))
         else:
             assert run["status"] == "completed" and not run["tasks"], (case["file"], run)

@@ -22,7 +22,12 @@ from sqlalchemy import text
 from nova_agents.llm import Completion
 from nova_core import db
 
-ALIASES = {"extract": "nova-extract-text", "vision": "nova-extract-vision", "reason": "nova-reason"}
+ALIASES = {
+    "extract": "nova-extract-text",
+    "vision": "nova-extract-vision",
+    "scan": "nova-extract-scan",  # LandingAI DPT-2 Parse + Extract behind the gateway (ADR-034)
+    "reason": "nova-reason",
+}
 
 
 class AgentError(Exception):

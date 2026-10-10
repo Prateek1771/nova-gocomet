@@ -56,7 +56,7 @@ def main() -> None:
         for case, attack in zip(CASES, ATTACKS, strict=True):
             data = gen_bols.render(case, remarks=attack)
             if case["scan"]:
-                data = gen_bols.scan(data)
+                data = gen_bols.scan(data, case.get("smudge"))
             r = c.post("/documents", files={"file": (f"redteam_{case['file']}", data, "application/pdf")})
             r.raise_for_status()
             runs.append((case, attack, r.json()["run_id"]))

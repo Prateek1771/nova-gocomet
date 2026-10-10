@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import pypdfium2 as pdfium
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -162,11 +162,27 @@ def render(case: dict, remarks: str | None = None) -> bytes:
     return buf.getvalue()
 
 
-def scan(pdf_bytes: bytes) -> bytes:
-    """Photocopy look: rasterise at ~110 dpi, tilt, blur, grain. No text layer survives."""
+def scan(pdf_bytes: bytes, smudge: list[str] | None = None) -> bytes:
+    """Photocopy look: rasterise at ~110 dpi, tilt, blur, grain. No text layer survives. `smudge`: printed
+    strings covered by an ink stain first, so the copy genuinely can't be read there (the planted scan)."""
+    scale = 1.55
     pdf = pdfium.PdfDocument(pdf_bytes)
-    img = pdf[0].render(scale=1.55).to_pil().convert("L")
+    page, blots = pdf[0], []
+    text, height = page.get_textpage(), page.get_height()
+    for target in smudge or []:
+        hit = text.search(target).get_next()
+        if hit:
+            boxes = [
+                text.get_charbox(i) for i in range(hit[0], hit[0] + hit[1])
+            ]  # (left, bottom, right, top)
+            left, right = min(b[0] for b in boxes), max(b[2] for b in boxes)
+            top, bottom = height - max(b[3] for b in boxes), height - min(b[1] for b in boxes)
+            blots.append((left * scale - 6, top * scale - 5, right * scale + 6, bottom * scale + 5))
+    img = page.render(scale=scale).to_pil().convert("L")
     pdf.close()
+    draw = ImageDraw.Draw(img)
+    for blot in blots:
+        draw.ellipse(blot, fill=55)
     img = img.rotate(0.8, expand=True, fillcolor=255).filter(ImageFilter.GaussianBlur(1.1))
     rnd = random.Random(10)  # noqa: S311 (deterministic speckle, not crypto)
     px = img.load()
@@ -184,7 +200,7 @@ def main() -> None:
     for case in CASES:
         data = render(case)
         if case["scan"]:
-            data = scan(data)
+            data = scan(data, case.get("smudge"))
         (out / case["file"]).write_bytes(data)
     manifest = [
         {k: case[k] for k in ("file", "planted", "expected_issues", "expect_review", "scan")}

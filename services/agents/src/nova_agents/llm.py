@@ -27,7 +27,8 @@ class BudgetExceeded(LLMError):
 
 
 def _fail(what: str, r: httpx.Response) -> LLMError:
-    if r.status_code in (400, 429) and "budget" in r.text.lower() and "exceed" in r.text.lower():
+    # LiteLLM has answered a spent budget with 400, 429 and (current) 422: match the message, not the code
+    if 400 <= r.status_code < 500 and "budget" in r.text.lower() and "exceed" in r.text.lower():
         return BudgetExceeded(f"{what}: LLM budget exhausted ({r.text[:200]})")
     return LLMError(f"{what}: HTTP {r.status_code} {r.text[:300]}")
 

@@ -2,6 +2,11 @@
 # decide fallback + embeddings. ~$0.0005 per BoL. Code only names the aliases (CLAUDE.md rule 6).
 # nova-decide -> nova-decide-fallback is done in code (nova_agents.decide), so no router fallback here.
 model_list:
+  # scans: LandingAI DPT-2 Parse + Extract via the custom provider in ade_handler.py (ADR-034).
+  # completion_tokens = ADE credits x 1000, priced so the gateway books $0.01 per credit on the tenant key.
+  - model_name: nova-extract-scan
+    litellm_params: {model: ade/dpt-2-20260903, api_key: os.environ/DPT_LANDING_API_KEY, api_base: https://api.va.landing.ai, num_retries: 0, timeout: 240}
+    model_info: {input_cost_per_token: 0, output_cost_per_token: 0.00001}
   - model_name: nova-extract-text
     litellm_params: {model: openrouter/google/gemini-2.5-flash-lite, api_key: os.environ/OPENROUTER_API_KEY}
   - model_name: nova-extract-vision
@@ -17,6 +22,8 @@ model_list:
   - model_name: nova-embed
     litellm_params: {model: ollama/nomic-embed-text, api_base: http://host.docker.internal:11434}
 litellm_settings:
+  custom_provider_map:
+    - {provider: ade, custom_handler: ade_handler.ade}
   drop_params: true             # providers ignore params they lack (e.g. response_format on ollama)
   cache: true
   cache_params: {type: redis, host: redis, port: 6379, ttl: 604800}   # 7 days: rehearsals are free

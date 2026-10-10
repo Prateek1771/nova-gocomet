@@ -122,7 +122,7 @@ sequenceDiagram
   A->>T: StartWorkflow(NovaWorkflow, def=bol_intake@v3, input)
   T->>E: run NovaWorkflow
   E->>G: activity agent:doc_extractor
-  G->>L: nova-extract-text (pdf text layer; vision only for scans) → fields, bboxes from word coords
+  G->>L: nova-extract-text (pdf text layer) or nova-extract-scan (scans: DPT-2 via the gateway) → fields, bboxes from word/chunk coords
   G-->>E: Extraction{fields, confidence, evidence}
   E->>G: activity agent:bol_validator
   G-->>E: Validation{issues[], evidence}
@@ -189,7 +189,7 @@ Each stage is a LangGraph node in a shared `governed_agent` template. Individual
 
   A role in the JWT is never enough on its own: every protected endpoint asks OpenFGA. Design: [LLD §7](03-lld.md#7-authorization-openfga), [§7a](03-lld.md#7a-authentication-keycloak), [ADR-018–020](06-adrs.md#adr-018-keycloak-for-authentication-one-realm-one-organization-per-tenant).
 - **Observability:** OTel SDK in all Python processes → OTel Collector → (prototype) Jaeger-compatible endpoint in Langfuse / console. Langfuse for LLM. Temporal UI for execution. Until M4, dev exports straight to Jaeger all-in-one on `:16686` (FastAPI, asyncpg and Temporal spans in one trace; [ADR-021](06-adrs.md#adr-021-jaeger-as-the-dev-trace-backend-until-the-m4-collector)).
-- **Cost control:** LiteLLM virtual key per tenant with `max_budget`; alias tiers `nova-extract-text`, `nova-extract-vision`, `nova-reason`, `nova-decide`, `nova-embed`; `LLM_MODE=local|cheap|demo` selects the LiteLLM config ([brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)); Redis response cache on.
+- **Cost control:** LiteLLM virtual key per tenant with `max_budget`; alias tiers `nova-extract-text`, `nova-extract-vision`, `nova-extract-scan` (LandingAI DPT-2, ADR-034), `nova-reason`, `nova-decide`, `nova-embed`; `LLM_MODE=local|cheap|demo` selects the LiteLLM config ([brainstorm §6.3](00-brainstorm.md#63-cost-three-llm-modes-mapped-to-the-models-you-already-have)); Redis response cache on.
 - **Idempotency:** every side-effecting activity takes an idempotency key `run_id:node_id:attempt-agnostic`. Outbox for external notifications.
 - **Versioning:** definitions are immutable once published. Runs store `definition_version`, and the interpreter uses Temporal `workflow.patched()` only for *engine* code changes, never for client logic.
 

@@ -7,6 +7,11 @@
 x-groq: &groq {api_key: os.environ/GROQ_API_KEY, rpm: 30, input_cost_per_token: 0, output_cost_per_token: 0}
 x-or: &or {api_key: os.environ/OPENROUTER_API_KEY}
 model_list:
+  # scans: LandingAI DPT-2 Parse + Extract via the custom provider in ade_handler.py (ADR-034).
+  # completion_tokens = ADE credits x 1000, priced so the gateway books $0.01 per credit on the tenant key.
+  - model_name: nova-extract-scan
+    litellm_params: {model: ade/dpt-2-20260903, api_key: os.environ/DPT_LANDING_API_KEY, api_base: https://api.va.landing.ai, num_retries: 0, timeout: 240}
+    model_info: {input_cost_per_token: 0, output_cost_per_token: 0.00001}
   - model_name: nova-extract-text
     litellm_params: {<<: *groq, model: groq/openai/gpt-oss-120b, reasoning_effort: low}
   - model_name: nova-reason
@@ -28,6 +33,8 @@ model_list:
   - model_name: free-any       # OpenRouter's own router over whatever free model is up
     litellm_params: {<<: *or, model: openrouter/openrouter/free}
 litellm_settings:
+  custom_provider_map:
+    - {provider: ade, custom_handler: ade_handler.ade}
   drop_params: true
   num_retries: 2
   fallbacks:

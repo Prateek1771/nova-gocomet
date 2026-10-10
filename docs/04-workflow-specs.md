@@ -37,7 +37,7 @@ Built in M2 ([ADR-022](06-adrs.md#adr-022-w1-build-decisions-bbox-schema-referen
 | `HS_FORMAT` | HS code not 6–10 digits | low |
 | `SEMANTIC_GOODS` (LLM) | description inconsistent with HS code | medium |
 
-**Planted errors in the seed (10 BoLs):** 2 bad check digits, 1 unknown LOCODE, 1 consignee mismatch, 1 weight sum off, 1 blurry scan (low confidence), 4 clean.
+**Planted errors in the seed (10 BoLs):** 2 bad check digits, 1 unknown LOCODE, 1 consignee mismatch, 1 weight sum off, 1 scan with an ink stain over a container number (DPT-2 can't read it, so the BoL shows 1 container against 2 booked → `BOOKING_MISMATCH` → review; ADR-034), 4 clean.
 
 **Bolt divergence:** Bolt skips human review for `low` severity issues and requires an ops_lead (not ops_exec) for `BOOKING_MISMATCH`.
 

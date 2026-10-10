@@ -47,6 +47,15 @@ def norm(v: Any) -> Any:
     return re.sub(r"[^A-Z0-9]+", " ", str(v).upper()).strip()
 
 
+def readable(case: dict[str, Any]) -> dict[str, Any]:
+    """The labels minus values an ink stain hides (`smudge`): no model can read those."""
+    hidden = set(case.get("smudge") or [])
+    return {
+        k: [x for x in v if not (isinstance(x, str) and x in hidden)] if isinstance(v, list) else v
+        for k, v in case["fields"].items()
+    }
+
+
 def pct(xs: list[float], q: float) -> float:
     xs = sorted(xs)
     return round(xs[min(len(xs) - 1, int(q * len(xs)))], 2) if xs else 0.0
@@ -65,8 +74,9 @@ async def main() -> None:
     for case in CASES:
         data = gen_bols.render(case)
         if case["scan"]:
-            data = gen_bols.scan(data)
+            data = gen_bols.scan(data, case.get("smudge"))
         calls: list[Any] = []
+        truth_fields = readable(case)
         t0 = time.perf_counter()
         for attempt in (1, 2, 3):  # like the activity's retry policy: a cut-off answer is retryable
             try:
@@ -79,7 +89,7 @@ async def main() -> None:
         cost += sum(c.cost_usd for c in calls)
         wrong = []
         for k in FIELDS:
-            truth, pred = norm(case["fields"][k]), norm(out["fields"].get(k))
+            truth, pred = norm(truth_fields[k]), norm(out["fields"].get(k))
             if truth == pred and truth is not None:
                 tp[k] += 1
             else:
@@ -93,7 +103,7 @@ async def main() -> None:
             i.code
             for i in checks.run(list(checks.CHECKS), out["fields"], checks.Ctx(booking=case["booking"]))
         }
-        want = set(case["expected_issues"])
+        want = set(case.get("review_issues", case["expected_issues"]))
         planted += len(want)
         found += len(want & issues)
         false_alarms += len(issues - want)

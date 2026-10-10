@@ -219,7 +219,7 @@ A single Temporal activity `run_agent(agent_key, input, run_meta)` looks up the 
 
 | Agent | Tier | Tools / context | Output |
 |---|---|---|---|
-| `doc_extractor` | extract | `pdfplumber` text layer + word bboxes → `nova-extract-text`; `nova-extract-vision` only for pages without text; `Extractor` adapter (DPT-2 optional); schema registry | `fields{}`, per-field `confidence`, `evidence[{page,bbox,text}]` |
+| `doc_extractor` | extract | `pdfplumber` text layer + word bboxes → `nova-extract-text`; documents with scanned pages → `nova-extract-scan` (LandingAI DPT-2 Parse + Extract behind the gateway, chunk boxes → evidence; ADR-034), `nova-extract-vision` only as its fallback; schema registry | `fields{}`, per-field `confidence`, `evidence[{page,bbox,text}]` |
 | `bol_validator` | reason | deterministic checks first (ISO 6346 check digit, UN/LOCODE lookup, dates, weights sum) → LLM for cross-doc semantics vs booking | `issues[{code,field,severity,evidence}]` |
 | `invoice_dedupe` | — (no model) | earlier extractions with the same carrier + invoice number | `duplicate`, `prior_document_id` |
 | `invoice_matcher` | reason | PO lines, rate contract (Weaviate hybrid clause search; the model picks, code verifies the citation), FX table, container events | `matches[]`, `total_usd`, `variance_pct`, `issues[]`, `max_severity`, `cited_clauses[]`, `accessorials[]` |
@@ -236,6 +236,8 @@ model_list:
     litellm_params: {model: openrouter/anthropic/claude-sonnet-5.5, api_key: os.environ/OPENROUTER_API_KEY}
   - model_name: nova-extract-vision
     litellm_params: {model: openrouter/anthropic/claude-sonnet-5.5}
+  - model_name: nova-extract-scan   # LandingAI DPT-2 via custom provider infra/litellm/ade_handler.py (ADR-034)
+    litellm_params: {model: ade/dpt-2-20260903, api_key: os.environ/DPT_LANDING_API_KEY, num_retries: 0}
   - model_name: nova-reason
     litellm_params: {model: openrouter/anthropic/claude-sonnet-5.5}
   - model_name: nova-decide

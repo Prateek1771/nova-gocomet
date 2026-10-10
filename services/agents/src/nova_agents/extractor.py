@@ -1,13 +1,16 @@
-"""doc_extractor (ADR-016): pdfplumber text layer → nova-extract-text; pages with no text layer are
-rendered and sent to nova-extract-vision. The model returns values only. Evidence (page + bbox) and
-per-field confidence are recovered deterministically by matching values back to word boxes, so a
-confident-sounding model can't fake a highlight."""
+"""doc_extractor (ADR-016, ADR-034): pdfplumber text layer → nova-extract-text. A document with pages
+that have no text layer (a scan) goes to nova-extract-scan (LandingAI DPT-2 Parse + Extract behind the
+gateway); if that fails it falls back to rendering the scans for nova-extract-vision. Models return
+values only. Evidence (page + bbox) and per-field confidence are recovered deterministically by matching
+values back to word boxes (pdfplumber's, or DPT-2's chunk boxes on scans), so a confident-sounding model
+can't fake a highlight."""
 
 import asyncio
 import base64
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import uuid
@@ -20,10 +23,12 @@ import pypdfium2 as pdfium
 from sqlalchemy import text
 
 from nova_agents import llm
-from nova_agents.matching import Match, Word, locate
+from nova_agents.llm import BudgetExceeded, LLMError
+from nova_agents.matching import Match, Word, chunk_text, chunk_words, locate
 from nova_agents.pipeline import ALIASES, AgentError, AgentSpec, State, record, schema_errors
 from nova_core import db, storage
 
+log = logging.getLogger(__name__)
 DEFINITIONS = Path(os.environ.get("DEFINITIONS_DIR", Path(__file__).resolve().parents[4] / "definitions"))
 MIN_WORDS = 8  # fewer words than this on a page = no usable text layer (a scan)
 # ponytail: a value read by the vision model has no word box to check against, so its confidence is
@@ -112,7 +117,27 @@ def _prune(value: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
         item = p.get("items") if p.get("type") == "array" else None
         if isinstance(item, dict) and "properties" in item and isinstance(out[k], list):
             out[k] = [_prune(x, item) for x in out[k] if isinstance(x, dict)]
+        elif isinstance(out[k], list) and all(isinstance(x, str | int | float) for x in out[k]):
+            out[k] = list(dict.fromkeys(out[k]))  # a code repeated per cargo line is listed once
     return out
+
+
+def ade_schema(schema: Any) -> Any:
+    """The schema as ADE Extract takes it: our `x-nova-*` hints and `$id`/`$schema` stripped."""
+    if isinstance(schema, dict):
+        return {k: ade_schema(v) for k, v in schema.items() if not k.startswith(("x-", "$"))}
+    if isinstance(schema, list):
+        return [ade_schema(v) for v in schema]
+    return schema
+
+
+def page_sizes(data: bytes, pages: list[int]) -> dict[int, tuple[float, float]]:
+    """(width, height) in PDF points for the given 1-based pages."""
+    pdf = pdfium.PdfDocument(data)
+    try:
+        return {p: (float(pdf[p - 1].get_width()), float(pdf[p - 1].get_height())) for p in pages}
+    finally:
+        pdf.close()
 
 
 def evidence_for(
@@ -134,8 +159,9 @@ def evidence_for(
                 )
                 return VISION_CONFIDENCE
             return UNMATCHED_CONFIDENCE
-        evidence.append({"field": path, "page": m.page, "bbox": m.bbox, "text": m.text, "score": m.score})
-        return min(m.score, VISION_CONFIDENCE) if vision_pages and not words else m.score
+        score = min(m.score, m.conf)  # a DPT-2 word in a low-confidence span pulls the field down
+        evidence.append({"field": path, "page": m.page, "bbox": m.bbox, "text": m.text, "score": score})
+        return min(score, VISION_CONFIDENCE) if vision_pages and not words else score
 
     for k, v in fields.items():
         if v is None or v == [] or k in skip:
@@ -214,22 +240,23 @@ def _messages(
     return [system, {"role": "user", "content": parts}]
 
 
-async def extract(
-    data: bytes, schema_key: str, meta: dict[str, str], on_call: Any = None, fresh: bool = False
-) -> dict[str, Any]:
-    """The extractor without the pipeline around it (also used by scripts/eval_llm.py): bytes in,
-    fields + per-field confidence + evidence out. `on_call(completion)` books each model call."""
-    schema = load_schema(schema_key)
-    words, texts, scans = await asyncio.to_thread(read_pdf, data)
-    alias = ALIASES["vision"] if scans else ALIASES["extract"]
-    messages = await asyncio.to_thread(_messages, data, texts, scans, schema)
+async def _llm_fields(
+    alias: str,
+    messages: list[dict[str, Any]],
+    schema: dict[str, Any],
+    meta: dict[str, str],
+    on_call: Any,
+    fresh: bool,
+) -> tuple[dict[str, Any], str]:
+    """One model call, plus one repair round-trip with the validator's messages."""
     c, raw = await llm.chat_json(alias, messages, metadata=meta, max_tokens=4000, fresh=fresh)
     if on_call:
         on_call(c)
     fields = clean(raw, schema)
     errors = schema_errors(schema, fields)
-    if errors:  # one repair round-trip with the validator's messages
-        messages += [
+    if errors:
+        messages = [
+            *messages,
             {"role": "assistant", "content": c.content},
             {
                 "role": "user",
@@ -244,18 +271,93 @@ async def extract(
         fields = clean(raw, schema)
         if errors := schema_errors(schema, fields):
             raise AgentError(f"extraction does not match {schema['$id']}: {errors[:3]}")
+    return fields, c.model
+
+
+def _page_of(chunk: dict[str, Any]) -> int:
+    return int((chunk.get("grounding") or {}).get("page") or 0) + 1
+
+
+async def _scan(
+    data: bytes,
+    schema: dict[str, Any],
+    words: list[Word],
+    texts: dict[int, str],
+    scans: list[int],
+    meta: dict[str, str],
+    on_call: Any,
+    fresh: bool,
+) -> dict[str, Any]:
+    """DPT-2 Parse + Extract through the gateway (ADR-034). Its chunk boxes become words, so evidence and
+    confidence come from the same value matching as text PDFs. An extraction that doesn't fit the schema
+    is redone by nova-extract-text over the DPT-2 text."""
+    pdf = "data:application/pdf;base64," + base64.b64encode(data).decode()
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": json.dumps(ade_schema(schema))},
+        {"role": "user", "content": [{"type": "file", "file": {"file_data": pdf}}]},
+    ]
+    c, out = await llm.chat_json(ALIASES["scan"], messages, metadata=meta, fresh=fresh)
+    if on_call:
+        on_call(c)
+    if not isinstance(out, dict):
+        raise LLMError("nova-extract-scan did not return an object")
+    chunks = [ch for ch in out.get("chunks") or [] if isinstance(ch, dict)]
+    sizes = await asyncio.to_thread(page_sizes, data, scans)
+    all_words = words + chunk_words(chunks, out.get("grounding") or {}, sizes)
+    fields, model = clean(out.get("extraction") or {}, schema), c.model
+    if schema_errors(schema, fields):
+        ocr = {
+            p: "\n".join(chunk_text(ch.get("markdown") or "") for ch in chunks if _page_of(ch) == p)
+            for p in scans
+        }
+        retry = await asyncio.to_thread(_messages, data, {**texts, **ocr}, [], schema)
+        fields, model = await _llm_fields(ALIASES["extract"], retry, schema, meta, on_call, fresh)
+    confidence, evidence = evidence_for(fields, all_words, [], schema)
+    return {
+        "fields": fields,
+        "confidence": confidence,
+        "min_confidence": min(confidence.values(), default=0.0),
+        "evidence": evidence,
+        "mode": "dpt2",
+        "schema": schema["$id"],
+        "model": model,
+    }
+
+
+async def extract(
+    data: bytes, schema_key: str, meta: dict[str, str], on_call: Any = None, fresh: bool = False
+) -> dict[str, Any]:
+    """The extractor without the pipeline around it (also used by scripts/eval_llm.py): bytes in,
+    fields + per-field confidence + evidence out. `on_call(completion)` books each model call."""
+    schema = load_schema(schema_key)
+    words, texts, scans = await asyncio.to_thread(read_pdf, data)
+    note = None
+    if scans:
+        try:
+            return await _scan(data, schema, words, texts, scans, meta, on_call, fresh)
+        except BudgetExceeded:
+            raise  # vision bills the same tenant key; the engine opens a needs_attention task
+        except LLMError as e:  # alias absent (LLM_MODE=local) or provider down: vision still works
+            log.warning("nova-extract-scan failed, falling back to vision: %s", e)
+            note = f"DPT-2 unavailable, used vision: {str(e)[:200]}"
+    alias = ALIASES["vision"] if scans else ALIASES["extract"]
+    messages = await asyncio.to_thread(_messages, data, texts, scans, schema)
+    fields, model = await _llm_fields(alias, messages, schema, meta, on_call, fresh)
     confidence, evidence = evidence_for(fields, words, scans, schema)
     if scans:  # nothing on a scan can be checked against a text layer
         confidence = {k: min(v, VISION_CONFIDENCE) for k, v in confidence.items()}
-    return {
+    result = {
         "fields": fields,
         "confidence": confidence,
         "min_confidence": min(confidence.values(), default=0.0),
         "evidence": evidence,
         "mode": "vision" if scans else "text",
         "schema": schema["$id"],
-        "model": c.model,
+        "model": model,
     }
+    if note:
+        result["note"] = note
+    return result
 
 
 async def _execute(s: State) -> dict[str, Any]:
