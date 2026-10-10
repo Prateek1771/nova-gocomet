@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     clickhouse_reader: str = "nova_reader"
     clickhouse_reader_password: str = "nova_reader"  # noqa: S105 (dev default; env overrides)
     kafka_lag_alert: int = 1000  # messages behind, sustained 60 s -> KAFKA_LAG_ALERT
+    clickhouse_admin: str = "nova"  # the simulator's --reset only (truncates shipment_events)
+    clickhouse_admin_password: str = "nova"  # noqa: S105 (dev default; env overrides)
+    sim_seconds_per_day: float = 60.0  # W3 simulator pace: 1 sim-day = 1 real minute (docs/04)
     max_upload_mb: int = 20
     max_pages: int = 20
     log_level: str = "INFO"

@@ -2,7 +2,7 @@
 # lines below directly.
 COMPOSE = docker compose -f infra/docker-compose.yml --env-file .env --profile core
 
-.PHONY: up up-data up-full sim down logs seed test test-int lint fmt gen ci bols invoices reindex bench-llm redteam audit-verify
+.PHONY: up up-data up-full sim sim-fast down logs seed test test-int lint fmt gen ci bols invoices reindex bench-llm redteam audit-verify
 
 up:            ## core stack: postgres, redis, keycloak, temporal, api (+migrate/seed), engine, web
 	$(COMPOSE) up -d --build
@@ -14,7 +14,10 @@ up-full:       ## core + data + ai (Langfuse on :3400, collector also exports to
 	OTEL_COLLECTOR_CONFIG=collector.ai.yaml LANGFUSE_URL=http://localhost:3400 $(COMPOSE) --profile data --profile ai up -d --build
 
 sim:           ## replay the W3 shipment scenario from sim-day 0 (clears shipment events, resolves open exceptions)
-	$(COMPOSE) --profile data run --rm simulator python -m nova_ingest.simulator --reset
+	$(COMPOSE) --profile data run --rm --no-deps simulator python -m nova_ingest.simulator --reset
+
+sim-fast:      ## the W3 scenario in seconds: days 0-11 (all 6 incidents open, incl. the transient missed connection), then the rest
+	$(COMPOSE) --profile data run --rm --no-deps simulator python -m nova_ingest.simulator --reset --fast --until 11
 
 down:
 	$(COMPOSE) --profile ai --profile data down

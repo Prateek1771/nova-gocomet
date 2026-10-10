@@ -21,6 +21,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Metrics */
+        get: operations["list_metrics_api_v1_analytics_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/metrics/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metric
+         * @description A governed metric for the caller's tenant (definitions/metrics.yaml; the row policy does the rest).
+         */
+        get: operations["metric_api_v1_analytics_metrics__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{key}": {
         parameters: {
             query?: never;
@@ -175,6 +212,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exceptions */
+        get: operations["list_exceptions_api_v1_exceptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{exception_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Exception */
+        get: operations["get_exception_api_v1_exceptions__exception_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -184,6 +255,46 @@ export interface paths {
         };
         /** Me */
         get: operations["me_api_v1_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notifications
+         * @description The notifier's mock sink: what would have been sent (dispute and customer delay emails).
+         */
+        get: operations["notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/kafka-lag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kafka Lag
+         * @description Consumer lag per group + topic (ops data, no tenant rows in it).
+         */
+        get: operations["kafka_lag_api_v1_ops_kafka_lag_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -606,10 +717,86 @@ export interface components {
             /** Yaml */
             yaml: string;
         };
+        /** ExceptionOut */
+        ExceptionOut: {
+            /** Detected At */
+            detected_at: string;
+            /** Facts */
+            facts: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /** Note */
+            note: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Severity */
+            severity: string;
+            /** Shipment */
+            shipment: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id?: string | null;
+            /** Type */
+            type: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LagOut */
+        LagOut: {
+            /** Alerting */
+            alerting: boolean;
+            /** Group Id */
+            group_id: string;
+            /** Lag */
+            lag: number;
+            /** Measured At */
+            measured_at: string;
+            /** Topic */
+            topic: string;
+        };
+        /** MetricOut */
+        MetricOut: {
+            /** Description */
+            description: string;
+            /** Metric */
+            metric: string;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Sql */
+            sql: string;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /** Body */
+            body: string;
+            /** Id */
+            id: string;
+            /** Received At */
+            received_at: string;
+            /** Recipient */
+            recipient: string;
+            /** Refs */
+            refs: {
+                [key: string]: unknown;
+            };
+            /** Subject */
+            subject: string;
+            /** Topic */
+            topic: string;
+            /** Type */
+            type: string;
         };
         /** Published */
         Published: {
@@ -889,6 +1076,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Budget"];
+                };
+            };
+        };
+    };
+    list_metrics_api_v1_analytics_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    metric_api_v1_analytics_metrics__name__get: {
+        parameters: {
+            query?: {
+                shipment_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1173,6 +1416,69 @@ export interface operations {
             };
         };
     };
+    list_exceptions_api_v1_exceptions_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_exception_api_v1_exceptions__exception_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -1195,12 +1501,65 @@ export interface operations {
             };
         };
     };
+    notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kafka_lag_api_v1_ops_kafka_lag_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LagOut"][];
+                };
+            };
+        };
+    };
     list_runs_api_v1_runs_get: {
         parameters: {
             query?: {
                 status?: string | null;
                 workflow_key?: string | null;
                 limit?: number;
+                /** @description leave out scheduled runs that completed (W3 fires each minute) */
+                hide_scheduled_ok?: boolean;
             };
             header?: never;
             path?: never;

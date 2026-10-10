@@ -311,22 +311,79 @@ OTel was configured but not running. Jaeger is now the dev trace UI ([ADR-021](0
 **Goal:** event-triggered exceptions (pattern C) on the real data stack.
 
 ### Tasks
-- [ ] `data` profile: Kafka KRaft, Kafka Connect + Debezium (outbox + `exceptions`, `run_steps`), ClickHouse, dbt one-shot.
-- [ ] ClickHouse tables, MVs, row policies ([LLD §5](03-lld.md#5-clickhouse)).
-- [ ] Simulator: 50 shipments, 6 lanes, 6 scripted incidents, 1 sim-day = 1 real minute.
-- [ ] dbt metrics: `eta_slip_hours`, `dwell_time_hours`, `invoice_variance_pct`, `touchless_rate`, `cost_per_run`.
-- [ ] Temporal schedule → `detect_exceptions`; CDC trigger router → `exception_triage`.
-- [ ] `exception_analyst` (`query_metric`, read-only, tenant setting); `action_recommender` (SOP search).
-- [ ] SOP corpus (~15 docs) indexed per Weaviate tenant; ExceptionPanel + analytics page.
+- [x] `data` profile: Kafka KRaft, Kafka Connect + Debezium (outbox + `exceptions`, `run_steps`, `workflow_runs`), ClickHouse, dbt one-shot (phase A).
+- [x] ClickHouse tables, MVs, row policies ([LLD §5](03-lld.md#5-clickhouse), phase A).
+- [x] **Simulator** (`nova_ingest.simulator`, seed from `scripts/gen_shipments.py`):
+  - 50 shipments (Acme 30, Bolt 20), 6 lanes, 6 scripted incidents, 1 sim-day = 1 real minute (`SIM_SECONDS_PER_DAY`).
+  - Every payload is validated against `shipment_event.v1`.
+  - `--reset` clears the events and W3 rows; `--fast --until <day>` plays a prefix (`make sim-fast`).
+  - The generator was tuned so that the missed connection no longer also raises DWELL.
+- [x] **dbt metrics:** `eta_slip_hours`, `dwell_time_hours`, `missed_transhipment`, `rollover`, `invoice_variance_pct`, `touchless_rate`, `cost_per_run`, plus `shipment_timeline` for the panel. The registry is `definitions/metrics.yaml` ([ADR-035](06-adrs.md#adr-035-governed-metrics-dbt-views-plus-a-registry-read-only-through-query_metric)).
+- [x] **Temporal schedule → `detect_exceptions`; CDC trigger router → `exception_triage`** ([ADR-036](06-adrs.md#adr-036-w3-build-decisions-schedules-trigger-router-sop-retrieval)):
+  - `trigger: schedule` gets a Temporal Schedule per tenant (`nova_core.schedules`, synced on publish and reconciled at API start); each firing runs the generic `ScheduledRun`, which creates the run and doesn't wait for it.
+  - `exceptions.detect` runs TenantConfig `exceptions.rules` (metric + op + threshold; Acme ETA 24 h, Bolt 12 h).
+  - The router (`nova_ingest.router`) starts every workflow with `trigger: event, exception.opened`, exactly once per exception.
+  - Migration 0007: `exceptions_once`, the unique run subject, and `run_id` / `resolved_at` / `note`.
+- [x] **Agents** (`nova_agents.exceptions`):
+  - `exception_analyst`: facts from `query_metric` (read-only, tenant setting, SQL kept as evidence); the model grades severity and writes the summary, with severity clamped to the enum.
+  - `action_recommender`: SOP hybrid search filtered by type; it keeps only retrieved picks, falls back to the top SOP, and drafts a customer message grounded in the detection row and the tenant rule.
+  - Actions: `exceptions.close`, `customer.notify` (outbox → `nova.outbox.shipment` → notifier → `notifications`).
+- [x] **SOP corpus and UI:**
+  - 15 SOPs in `definitions/sops` (45 chunks), indexed per Weaviate tenant shard (`vectors.Collection`, `make reindex`).
+  - **ExceptionPanel** micro-app: route strip, milestone timeline, ETA slip bar vs the tenant threshold, metric SQL + rows, and SOP-cited recommendations with the customer draft. DecisionBar adds accept / override (own message + reason) / dismiss.
+  - **`/exceptions` page:** KPI tiles, exception table, by-type bars, ETA slip watchlist, pipeline lag, notification sink. Analytics are gated by `can_view_analytics`.
+  - API: `/exceptions`, `/analytics/metrics[/{name}]`, `/notifications`, `/ops/kafka-lag`.
 
 ### Tests
-- [ ] Idempotent consumer replay: re-delivering offsets creates no duplicate runs or exceptions.
-- [ ] ClickHouse cross-tenant row-policy test (completes the M4 suite).
-- [ ] Event payloads validated against the Phase 0 schemas.
+- [x] **Idempotent consumer replay:** re-delivering a CDC record (`c`) or re-reading the snapshot (`r`) starts no second run (integration: 6 records × 3 deliveries → 6 runs); the next detection cycle raises nothing new. Live, the router restarted mid-stream and logged `trigger_duplicate` for the two it had already started.
+- [x] **ClickHouse cross-tenant row policy** (`tests/integration/test_w3_exceptions.py`, completes the M4 suite):
+  - `nova_reader` with Bolt's `SQL_tenant_id` sees only Bolt's shipments.
+  - Without the setting it errors, and it can't insert.
+  - The API refuses unregistered metrics (404) and `ops_exec` (403).
+- [x] **Event payloads validated against the Phase 0 schemas:** simulator output vs `shipment_event.v1` (unit); notifier input vs `outbox_event.v1` (integration, on the real outbox rows).
+- [x] **Unit** (`tests/unit/test_w3.py`, 16):
+  - a Python reference of the four rules over the whole scenario raises exactly the 6 incidents, with 0 false positives from ETA jitter
+  - analyst and recommender guards
+  - triage routing from both YAMLs (real CEL)
+  - the customer email carries no internal steps
+  - router and lag helpers
+- [x] **Engine** (`tests/engine/test_w3_exceptions.py`, 7): auto-close, accept → notify → close, override, dismiss, Bolt high-severity → human with a 30 min SLA escalating to tenant_admin, detection passes the rules, ScheduledRun.
 
 ### Exit criteria
-- [ ] 6 scripted incidents → exceptions within one cycle → triaged → notified, with no duplicates and SOP cited.
-- [ ] Kafka lag visible; lag alert configured.
+- [x] **6 scripted incidents → exceptions within one cycle → triaged → notified, with no duplicates and SOP cited.**
+  - Live on the stack (`LLM_MODE=free`, 2026-10-10), `sim-fast`:
+    - one detection cycle raised exactly 4 Acme + 2 Bolt exceptions
+    - all 6 were triaged to an ops-lead task, every recommendation citing an SOP section
+  - Headed Chrome:
+    - `lead@acme` accepted the rollover → the mock sink got the customer email citing SOP-ROLL-01, and the exception closed
+    - `lead@bolt` overrode the missed connection with their own message, which was sent with SOP-MTS-01 (the internal reason stayed internal)
+  - Integration: the same flow for both tenants, 6/6 notified.
+- [x] **Kafka lag visible; lag alert configured.**
+  - `kafka_lag` per group and topic shows on `/exceptions` (Pipeline card).
+  - It alerts when lag stays over `KAFKA_LAG_ALERT` (default 1000) for 60 s.
+  - Live: with ingest stopped and the threshold at 3, the router group reached 6 behind and `kafka_lag_alert` fired. After restart the router caught up, lag went back to 0 and the alert cleared.
+
+### Verification (2026-10-10)
+- **Automated:**
+  - lint, format, mypy (now including `nova_ingest`), import contracts
+  - unit 163; engine 35 (100% branch); vitest 23
+  - integration 57/57, including the new W3 end to end on real Postgres + ClickHouse + Weaviate + Temporal + OpenFGA
+  - gen (DSL schema, OpenAPI, TS types); web tsc + eslint
+- **Headed Chrome:**
+  - `/exceptions` as ops_exec (analytics hidden by role) and as ops_lead
+  - the ExceptionPanel for Acme and Bolt
+  - axe: 0 serious/critical on `/exceptions` and the panel
+- **Found and fixed during the build:**
+  - `cel.render` treated `"${{ a }} · ${{ b }}"` as one expression (its lazy fullmatch spans both); it now needs exactly one template. Regression test in `test_cel.py`.
+  - The 0001 partial unique index would have re-raised every resolved exception on the next cycle. It's now once per shipment + type (0007).
+  - A scheduled launcher that waited for its run blocked the schedule (overlap SKIP) as soon as a run hit needs_attention. It now starts the run abandoned.
+  - The engine image didn't ship `definitions/` (`metrics.yaml`).
+  - A structlog `event=` kwarg crashed the router.
+  - The notifier tried to validate `nova.outbox.run` events; it now takes `email.*` only.
+  - The route strip showed a missed-connection box sailing.
+  - The recommender named the planned vessel after a rollover and invented a cause; it now gets the detection row and the tenant rule, and is told to state only what's in them.
+  - The W1 integration test assumed `shipments` held only TMS rows.
+  - A scroll region wasn't focusable (axe).
 
 ---
 

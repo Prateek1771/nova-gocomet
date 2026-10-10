@@ -52,7 +52,7 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
   );
 }
 
-export const SEVERITY_TONE: Record<string, Tone> = { high: "bad", medium: "warn", low: "info" };
+export const SEVERITY_TONE: Record<string, Tone> = { critical: "bad", high: "bad", medium: "warn", low: "info" };
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("rounded-xl border border-line bg-panel", className)}>{children}</div>;

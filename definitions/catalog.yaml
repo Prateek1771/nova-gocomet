@@ -36,6 +36,21 @@ agents:
       document_id: {type: string, required: true}
       extraction: {type: expression, required: true}
     outputs: [matches, total_usd, variance_pct, issues, max_severity, cited_clauses, accessorials]
+  - key: exception_analyst
+    title: Exception analyst
+    tier: reason
+    description: Re-reads the exception's governed metric and the ETA slip for this shipment (read-only ClickHouse, tenant row policy; SQL kept as evidence); the model only grades severity and summarises.
+    with:
+      exception_id: {type: string, required: true}
+    outputs: [exception_id, type, severity, summary, slip_hours, rule, shipment, facts]
+  - key: action_recommender
+    title: Action recommender
+    tier: reason
+    description: Retrieves SOP sections for the exception type (Weaviate hybrid search); the model picks and phrases the next steps, code keeps only retrieved SOPs and cites them.
+    with:
+      exception_id: {type: string, required: true}
+      summary: {type: expression}
+    outputs: [recommendations, customer_message, retrieved]
 
 actions:
   - key: noop
@@ -67,6 +82,28 @@ actions:
       issues: {type: expression, required: true}
       clauses: {type: expression, required: true}
       reason: {type: string}
+  - key: exceptions.detect
+    title: Exceptions · detect
+    description: Runs each TenantConfig rule (governed metric + threshold) and raises one exception per shipment + type, with the metric SQL and row as evidence.
+    with:
+      rules: {type: expression, required: true, hint: "tenant.exceptions.rules"}
+      severity: {type: expression, hint: "tenant.exceptions.severity"}
+  - key: exceptions.close
+    title: Exceptions · close
+    description: Resolves an exception with a note.
+    with:
+      exception_id: {type: string, required: true}
+      note: {type: string}
+      reason: {type: expression}
+  - key: customer.notify
+    title: Customer · delay notification
+    description: Queues the customer email (outbox); it states what happened and the next steps with the SOP each follows.
+    with:
+      exception_id: {type: string, required: true}
+      recommendations: {type: expression, required: true}
+      customer_message: {type: expression, hint: "the recommender's draft"}
+      override_action: {type: expression, hint: "the ops lead's own message (override)"}
+      reason: {type: string}
 
 apps:
   - key: bol_review
@@ -75,6 +112,9 @@ apps:
   - key: invoice_review
     title: Invoice review
     description: Invoice PDF, findings, line-by-line comparison against PO and contract with cited clauses; approve, dispute or reject.
+  - key: exception_panel
+    title: Exception panel
+    description: Shipment timeline and route, the metric facts (SQL + rows) behind the exception, SOP-cited recommendations; accept, override or dismiss.
   - key: generic_review
     title: Generic approval
     builtin: true

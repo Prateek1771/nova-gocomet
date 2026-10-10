@@ -7,7 +7,7 @@ Run: uv run python -m nova_api.seed
 import asyncio
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import text
@@ -33,6 +33,22 @@ TENANTS = {
                 "l2_limit_usd": 10000,
                 "l2_variance_pct": 5,
             },
+            # W3 detection (docs/04): one rule per exception type over a governed metric (metrics.yaml);
+            # a new type = a metric + a rule here + SOPs (docs/09 C). Severity is the analyst's fallback.
+            "exceptions": {
+                "rules": [
+                    {"type": "ETA_SLIP", "metric": "eta_slip_hours", "op": ">", "threshold": 24},
+                    {"type": "DWELL", "metric": "dwell_time_hours", "op": ">", "threshold": 72},
+                    {"type": "MISSED_TS", "metric": "missed_transhipment", "op": "=", "threshold": 1},
+                    {"type": "ROLLOVER", "metric": "rollover", "op": ">=", "threshold": 1},
+                ],
+                "severity": {
+                    "ETA_SLIP": "high",
+                    "DWELL": "medium",
+                    "MISSED_TS": "high",
+                    "ROLLOVER": "medium",
+                },
+            },
         },
     ),
     "bolt": (
@@ -48,6 +64,22 @@ TENANTS = {
                 "auto_limit_usd": 1000,
                 "l2_limit_usd": 5000,
                 "l2_variance_pct": 3,
+            },
+            # W3 detection (docs/04): one rule per exception type over a governed metric (metrics.yaml);
+            # a new type = a metric + a rule here + SOPs (docs/09 C). Severity is the analyst's fallback.
+            "exceptions": {
+                "rules": [
+                    {"type": "ETA_SLIP", "metric": "eta_slip_hours", "op": ">", "threshold": 12},
+                    {"type": "DWELL", "metric": "dwell_time_hours", "op": ">", "threshold": 72},
+                    {"type": "MISSED_TS", "metric": "missed_transhipment", "op": "=", "threshold": 1},
+                    {"type": "ROLLOVER", "metric": "rollover", "op": ">=", "threshold": 1},
+                ],
+                "severity": {
+                    "ETA_SLIP": "high",
+                    "DWELL": "medium",
+                    "MISSED_TS": "high",
+                    "ROLLOVER": "medium",
+                },
             },
         },
     ),
@@ -194,6 +226,41 @@ async def seed_w2(c: AsyncConnection, tid: object) -> None:
         )
 
 
+async def seed_w3(c: AsyncConnection, tid: object, slug: str) -> None:
+    """W3 shipments the simulator plays (definitions/seed/shipments.json, scripts/gen_shipments.py). Ids come
+    from the seed, so ClickHouse events and Postgres exceptions join on shipment_id."""
+    w3 = json.loads((DEFINITIONS / "seed" / "shipments.json").read_text(encoding="utf-8"))
+    epoch = datetime.fromisoformat(w3["sim_epoch"])
+    for sh in (x for x in w3["shipments"] if x["tenant"] == slug):
+        await c.execute(
+            text("""insert into shipments (id, tenant_id, bol_number, container_no, pol, pod, ts_port, lane,
+                      vessel, voyage, etd, eta_planned, eta_current, status, fields)
+                    values (:id, :t, :b, :c, :pol, :pod, :ts, :lane, :v, :voy, :etd, :eta, :eta, 'in_transit',
+                      cast(:f as jsonb))
+                    on conflict (id) do update set container_no = excluded.container_no, pol = excluded.pol,
+                      pod = excluded.pod, ts_port = excluded.ts_port, lane = excluded.lane,
+                      vessel = excluded.vessel, voyage = excluded.voyage, etd = excluded.etd,
+                      eta_planned = excluded.eta_planned, fields = excluded.fields"""),
+            {
+                "id": sh["id"],
+                "t": tid,
+                "b": sh["bol_number"],
+                "c": sh["container_no"],
+                "pol": sh["pol"],
+                "pod": sh["pod"],
+                "ts": sh["ts_port"],
+                "lane": sh["lane"],
+                "v": sh["vessel"],
+                "voy": sh["voyage"],
+                "etd": epoch + timedelta(days=sh["start"]),
+                "eta": epoch + timedelta(days=sh["eta_day"]),
+                "f": json.dumps(
+                    {"carrier": sh["carrier"], "consignee_email": f"ops@{slug}-customer.example"}
+                ),
+            },
+        )
+
+
 async def main() -> None:
     engine = create_async_engine(get_settings().migrations_database_url)
     async with engine.begin() as c:
@@ -236,6 +303,7 @@ async def main() -> None:
             print(f"seeded {slug} ({tid})")
             await seed_bookings(c, tid)
             await seed_w2(c, tid)
+            await seed_w3(c, tid, slug)
             await publish_definitions(c, tid, slug)
     await engine.dispose()
 

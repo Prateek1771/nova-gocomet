@@ -139,7 +139,7 @@ flowchart LR
 
 **Simulator:** 50 shipments across 6 lanes. It emits gate-in, loaded, departed, arrived, ETA-update, and discharged events at accelerated time (1 sim-day = 1 real minute). Scripted incidents: 3 ETA slips, 1 long dwell, 1 missed transhipment, 1 rollover.
 
-**SOP corpus (`data/sops/`):** ~15 markdown docs, such as "Rollover: re-book on next sailing, notify consignee within 4h, check free-time impact". They're chunked and embedded into the Weaviate tenant.
+**SOP corpus (`definitions/sops/`, ADR-036):** 15 markdown docs, such as "Rollover: re-book on next sailing, notify consignee within 4h, check free-time impact", including two carrier playbooks (Maersk, MSC). Each `##` section is one chunk, embedded into every Weaviate tenant shard (`make reindex`).
 
 **Acceptance:** all 6 scripted incidents become exceptions within one detection cycle, there are no duplicates for the same shipment + type, the recommendation cites an SOP, and the notification appears in the mock sink.
 

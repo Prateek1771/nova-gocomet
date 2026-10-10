@@ -13,4 +13,4 @@ COPY --from=build /app/.venv /app/.venv
 COPY definitions /app/definitions
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 DEFINITIONS_DIR=/app/definitions
 USER nova
-CMD ["python", "-m", "nova_ingest.router"]
+CMD ["python", "-m", "nova_ingest"]

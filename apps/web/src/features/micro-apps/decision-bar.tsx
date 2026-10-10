@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Check, Loader2, MessageSquareWarning, RotateCcw, X } from "lucide-react";
+import { Ban, BellRing, Check, Loader2, MessageSquareWarning, PencilLine, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,6 +17,9 @@ const OUTCOMES: Record<string, { label: string; icon: ReactNode; key?: string; p
   rejected: { label: "Reject", icon: <X className="size-4" />, key: "r", danger: true },
   retry: { label: "Retry step", icon: <RotateCcw className="size-4" />, primary: true },
   abort: { label: "Abort run", icon: <Ban className="size-4" />, danger: true },
+  accept: { label: "Accept & notify", icon: <BellRing className="size-4" />, key: "a", primary: true },
+  override: { label: "Override", icon: <PencilLine className="size-4" />, key: "o" },
+  dismiss: { label: "Dismiss", icon: <X className="size-4" />, key: "x", danger: true },
 };
 
 /** Decide a task. Claims first when needed (the engine only accepts completion from the claimer);
@@ -26,9 +29,12 @@ export function DecisionBar({
   requireReasonFor = [],
   sendsFields: editable = false,
   approveLabel,
+  actionFor = [],
 }: {
   options?: string[];
   requireReasonFor?: string[];
+  /** outcomes that carry the reviewer's own next step as `payload.action` (exception_panel override) */
+  actionFor?: string[];
   /** the app edits fields (FieldForm) and an approval carries them downstream (bol_review) */
   sendsFields?: boolean;
   approveLabel?: string;
@@ -37,18 +43,23 @@ export function DecisionBar({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [action, setAction] = useState("");
   const [asking, setAsking] = useState(false);
+  const [askingAction, setAskingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const actionRef = useRef<HTMLInputElement>(null);
   const done = task.status === "done";
   const claimedByOther = task.status === "claimed" && task.assignee_user && task.assignee_user !== me;
   const sendsFields = editable && options.includes("approved") && Object.keys(fields).length > 0;
 
   const submit = useCallback(
     async (decision: string) => {
-      if (requireReasonFor.includes(decision) && !reason.trim()) {
-        setAsking(true);
-        setTimeout(() => reasonRef.current?.focus(), 0);
+      const needsAction = actionFor.includes(decision) && !action.trim();
+      if (needsAction || (requireReasonFor.includes(decision) && !reason.trim())) {
+        setAsking(requireReasonFor.includes(decision));
+        setAskingAction(actionFor.includes(decision));
+        setTimeout(() => (needsAction ? actionRef.current : reasonRef.current)?.focus(), 0);
         return;
       }
       setBusy(decision);
@@ -57,6 +68,7 @@ export function DecisionBar({
         if (task.status !== "claimed") await postJson<TaskOut>(`/tasks/${task.id}/claim`);
         const payload: Record<string, unknown> = decision === "approved" && sendsFields ? { fields } : {};
         if (reason.trim()) payload.reason = reason.trim();
+        if (actionFor.includes(decision) && action.trim()) payload.action = action.trim();
         await postJson<TaskOut>(`/tasks/${task.id}/complete`, { decision, payload });
         router.push("/inbox");
         router.refresh();
@@ -65,7 +77,7 @@ export function DecisionBar({
         setBusy(null);
       }
     },
-    [fields, reason, requireReasonFor, router, sendsFields, task.id, task.status],
+    [action, actionFor, fields, reason, requireReasonFor, router, sendsFields, task.id, task.status],
   );
 
   useEffect(() => {
@@ -82,6 +94,16 @@ export function DecisionBar({
   return (
     <div className="sticky bottom-0 border-t border-line bg-panel/95 p-4 backdrop-blur">
       {claimedByOther && <p className="mb-2 text-xs text-warn">Claimed by another reviewer. You can read it, but only they can decide.</p>}
+      {askingAction && (
+        <input
+          ref={actionRef}
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          aria-label="Your message to the customer"
+          placeholder="Your message to the customer (replaces the draft)"
+          className="mb-2 w-full rounded-md border border-line bg-panel px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+        />
+      )}
       {asking && (
         <textarea
           ref={reasonRef}

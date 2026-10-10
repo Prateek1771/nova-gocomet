@@ -1,0 +1,28 @@
+{
+  "key": "exception_panel",
+  "title": "Exception panel",
+  "layout": {
+    "type": "split",
+    "children": [
+      {"type": "ExceptionPanel", "bind": {"exception_id": "$.exception_id", "type": "$.type", "severity": "$.severity", "summary": "$.summary", "shipment": "$.shipment", "facts": "$.facts", "slip_hours": "$.slip_hours", "rule": "$.rule", "customer_impacting": "$.customer_impacting", "why": "$.why"}},
+      {"type": "stack", "children": [
+        {"type": "Recommendations", "bind": {"recommendations": "$.recommendations", "customer_message": "$.customer_message"}},
+        {"type": "DecisionBar", "options": ["accept", "override", "dismiss"], "requireReasonFor": ["override", "dismiss"], "actionFor": ["override"]}
+      ]}
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["decision"],
+    "additionalProperties": false,
+    "properties": {
+      "decision": {"enum": ["accept", "override", "dismiss"]},
+      "reason": {"type": "string", "maxLength": 2000},
+      "action": {"type": "string", "maxLength": 500}
+    },
+    "allOf": [
+      {"if": {"properties": {"decision": {"enum": ["override", "dismiss"]}}}, "then": {"required": ["decision", "reason"]}},
+      {"if": {"properties": {"decision": {"const": "override"}}}, "then": {"required": ["decision", "reason", "action"]}}
+    ]
+  }
+}

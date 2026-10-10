@@ -35,7 +35,7 @@ select = ["E", "F", "I", "UP", "B", "S", "ASYNC"]
 ignore = ["S101"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents"]
+known-first-party = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents", "nova_ingest"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106", "E501"]
@@ -44,11 +44,11 @@ known-first-party = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_a
 
 [tool.mypy]
 strict = true
-packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents"]
+packages = ["nova_core", "nova_dsl", "nova_api", "nova_engine", "nova_agents", "nova_ingest"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "celpy.*", "lark.*", "pdfplumber.*", "pypdfium2.*", "reportlab.*", "minio.*"]
+module = ["testcontainers.*", "celpy.*", "lark.*", "pdfplumber.*", "pypdfium2.*", "reportlab.*", "minio.*", "aiokafka.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

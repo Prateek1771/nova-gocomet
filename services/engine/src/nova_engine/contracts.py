@@ -87,9 +87,18 @@ class SubrunRequest:
     tenant_id: str
     key: str
     version: int | None
-    config_version: int  # a child runs on its parent's pinned config
+    config_version: int | None  # a child runs on its parent's pinned config; None = latest (schedules)
     input: dict[str, Any]
-    parent_run_id: str
+    parent_run_id: str  # the subject id: the parent run, or the schedule for a scheduled run
+    subject_type: str = "run"
+
+
+@dataclass
+class ScheduledFire:
+    """What a Temporal Schedule passes to SCHEDULED_RUN (nova_core.schedules)."""
+
+    tenant_id: str
+    key: str
 
 
 @dataclass
@@ -97,3 +106,4 @@ class Subrun:
     run_id: str
     definition_id: str
     input: dict[str, Any]
+    config_version: int = 0  # the version create_run pinned (latest, for a scheduled run)

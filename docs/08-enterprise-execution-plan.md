@@ -202,7 +202,7 @@ LLM provider outage · Jev unavailable · Stuck workflow runs · Kafka consumer 
 | Temporal | Its own DB PITR (or Temporal Cloud) | 5 min | 1 h |
 | MinIO/S3 | Versioning + cross-region replication | ~0 | 1 h |
 | ClickHouse | Rebuildable from Kafka/CDC + daily backup | 24 h | 4 h |
-| Weaviate | Rebuildable from `data/sops` + snapshots | 24 h | 1 h |
+| Weaviate | Rebuildable from `definitions/sops` + snapshots | 24 h | 1 h |
 
 Restore drills run quarterly in staging. A drill counts as done only when the restored environment passes the E2E suite.
 

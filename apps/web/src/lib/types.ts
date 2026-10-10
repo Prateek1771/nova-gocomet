@@ -8,6 +8,10 @@ export type RunOut = S["RunOut"];
 export type RunDetail = S["RunDetail"];
 export type StepOut = S["StepOut"];
 export type TaskOut = S["TaskOut"];
+export type ExceptionOut = S["ExceptionOut"];
+export type MetricOut = S["MetricOut"];
+export type NotificationOut = S["NotificationOut"];
+export type LagOut = S["LagOut"];
 
 /** Evidence the extractor attaches to a field: page + bbox in PDF points, top-left origin (ADR-022). */
 export type Evidence = { field: string; page: number; bbox: [number, number, number, number] | null; text: string; score: number | null };

@@ -31,6 +31,8 @@ def test_templates_keep_types_and_interpolate() -> None:
     assert cel.render({"t": "BoL ${{ nodes.extract.output.fields.bol }}!"}, ACT) == {"t": "BoL B1!"}
     assert cel.render(["${{ tenant.approval_limits }}"], ACT) == [{"ops_lead": 10000}]
     assert cel.render(7, ACT) == 7
+    # starts and ends with a template but holds two: text, not one expression spanning both
+    assert cel.render("${{ input.amount }} · ${{ nodes.extract.output.fields.bol }}", ACT) == "1500 · B1"
 
 
 def test_coalesce_falls_through_null_and_missing() -> None:

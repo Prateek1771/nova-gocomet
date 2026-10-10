@@ -13,7 +13,7 @@ const NAV = [
   { label: "Documents", href: "/documents", icon: FileText, m: null },
   { label: "Runs", href: "/runs", icon: Activity, m: null },
   { label: "Studio", href: "/studio", icon: Workflow, m: null },
-  { label: "Exceptions", href: "/exceptions", icon: ShieldAlert, m: "M6" },
+  { label: "Exceptions", href: "/exceptions", icon: ShieldAlert, m: null },
   { label: "Admin", href: "/admin", icon: Settings, m: null, needs: ["can_edit_config", "can_manage_budgets", "can_read_audit"] },
 ];
 

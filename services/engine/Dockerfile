@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --packag
 FROM python:3.13-slim-bookworm
 RUN useradd --system --uid 10001 nova
 COPY --from=build /app/.venv /app/.venv
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1
+COPY definitions /app/definitions
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 DEFINITIONS_DIR=/app/definitions
 USER nova
 CMD ["python", "-m", "nova_engine.worker"]

@@ -304,3 +304,29 @@ Code still names only aliases (rule 6). Jev's decisions API is reached only in `
 - ADE Extract doesn't use our injection-hardened extraction prompt. Deterministic checks and human tasks still gate every state change (rules 3–4).
 - Table-cell references in Extract's metadata don't resolve in the Parse response, so evidence comes from value matching, not references.
 - Chunk boxes are split evenly by line and character, so highlights are approximate within a chunk. Synthetic documents only, as with every cloud mode.
+
+## ADR-035: Governed metrics: dbt views plus a registry, read only through `query_metric`
+
+**Context.** FR-4.2 says agents query metrics, not raw tables. W3 detection, the exception analyst and the analytics API all read ClickHouse. Letting a model or a caller write SQL against tenant facts would make tenant isolation depend on the prompt, and lose the definition of what a metric means.
+**Decision.**
+- Every metric is a dbt model in `infra/dbt/models`, built as a view in `nova_metrics` (views, so they're always current; the `dbt` one-shot re-creates them on every `up --profile data`).
+- `definitions/metrics.yaml` is the registry: description, grain, the `value` rules compare, the `columns` returned and their `order`.
+- `nova_core.clickhouse.query_metric(tenant, metric, shipment_id?, op?, threshold?, limit)` is the only read path. It refuses an unregistered name, builds the SQL itself from the registry (identifiers are trusted config; values are bound `{x:Type}` parameters), and runs it as the read-only `nova_reader` with `SQL_tenant_id` set.
+- Row policies on every fact table key on `getSetting('SQL_tenant_id')`; without it the query errors instead of returning every tenant. The admin user (`nova`: dbt, ingestion) keeps a pass-through policy.
+- The SQL and params are returned with the rows, so they can be shown as evidence.
+**Consequences.** A new metric is a dbt model plus a registry entry, with no code change. Nobody can query a raw table through Nova; the ClickHouse UI and dbt keep admin access for ops. The reader can't write (`readonly = 2`).
+
+## ADR-036: W3 build decisions (schedules, trigger router, SOP retrieval)
+
+**Context.** W3 is pattern C (docs/09): a schedule detects, CDC on the insert triggers the triage. M6 has to deliver it on the real data stack with no process code in the engine, and with every replay safe.
+**Decision.**
+- **Schedules.** A workflow with `trigger: {type: schedule, cron}` gets a Temporal Schedule per tenant + key (`sched-<tenant>-<key>`, overlap SKIP). The API syncs it on publish and reconciles all of them at startup (`nova_core.schedules`). Each firing runs the engine's generic `ScheduledRun`, which creates an ordinary run (latest version and config, subject `schedule`) and starts it as an abandoned child. It doesn't wait, because a run parked in needs_attention would otherwise hold the schedule forever.
+- **Detection** is an action, `exceptions.detect`, over TenantConfig `exceptions.rules` (`{type, metric, op, threshold}`) through `query_metric`. The thresholds are config (rule 2), not YAML. An exception is raised once per tenant + shipment + type, whatever its status (`exceptions_once`, migration 0007). The 0001 partial index only guarded open rows, so a resolved exception that still breached was raised again every cycle. The simulator's `--reset` clears W3 rows for replays.
+- **Trigger router** (`services/ingest`): `cdc.nova.public.exceptions` → every published workflow whose trigger is `{type: event, event: exception.opened}`. Exactly once per exception: `workflow_runs_one_per_exception` (unique subject) rejects a second run row. The run row, the `exceptions.run_id` link and the Temporal start commit in one transaction, and the Kafka offset is committed only after.
+- **Notifier**: `email.*` outbox messages → `notifications` (the mock sink), validated against `outbox_event.v1`, once per outbox id.
+- **Lag**: every 15 s, end offset minus committed offset per group and topic into `kafka_lag`. It alerts (a `kafka_lag_alert` log event plus the flag the Exceptions page shows) when lag stays over `KAFKA_LAG_ALERT` for 60 s.
+- **SOPs** live in `definitions/sops/*.md`, not `data/sops` as docs/04 sketched, because `definitions/` ships in every image and holds per-process content (rule 1). One chunk per `##` section goes into a `Sop` Weaviate collection per tenant shard, with the same retrieval code as clauses (`vectors.Collection`).
+- **Agents**: `exception_analyst`'s facts come from code (`query_metric` for the exception's metric plus `eta_slip_hours`); the model only grades severity and summarises. `action_recommender` keeps a pick only if it was retrieved (the W2 citation guard); with no usable answer the top retrieved SOP section is the recommendation, so every recommendation cites an SOP. It also drafts the customer message. The ops lead accepts it, or overrides it with their own words.
+- **UI**: no chart or map library. The route strip and bars are inline SVG/CSS on the theme tokens.
+- **Simulator**: `--fast --until <day>` plays a prefix of the scenario at once. The missed connection is only visible between sim days 10.5 and 12.2, so a fast replay of everything would hide it.
+**Consequences.** All 6 scripted incidents become exceptions in one cycle, and a replay changes no counts. That holds in the integration test (real Postgres, ClickHouse, Weaviate, Temporal) and live on the stack. A scheduled run per minute per tenant shows in the run list; a real deployment runs it every 5 minutes. Reconcile only removes the schedule of a definition that dropped its trigger at API startup, not at publish.

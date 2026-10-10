@@ -9,14 +9,22 @@ from typing import Any
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from nova_agents import extractor, invoices, validator
+from nova_agents import exceptions, extractor, invoices, validator
 from nova_agents.decide import DecideError
 from nova_agents.decide import decide as run_decide
 from nova_agents.llm import BudgetExceeded
 from nova_agents.pipeline import AgentError, book_cost, build
 from nova_core.temporal import AgentRequest
 
-AGENTS = {spec.key: build(spec) for spec in (extractor.SPEC, validator.SPEC, invoices.DEDUPE, invoices.SPEC)}
+SPECS = (
+    extractor.SPEC,
+    validator.SPEC,
+    invoices.DEDUPE,
+    invoices.SPEC,
+    exceptions.ANALYST_SPEC,
+    exceptions.RECOMMENDER_SPEC,
+)
+AGENTS = {spec.key: build(spec) for spec in SPECS}
 
 
 @activity.defn(name="run_agent")

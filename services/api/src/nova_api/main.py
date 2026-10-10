@@ -13,8 +13,19 @@ from sqlalchemy import text
 from nova_api import clauses, errors
 from nova_api.authz import TenantCaller, allowed
 from nova_api.deps import CallerDep
-from nova_api.routers import admin, apps, audit, catalog, config, documents, runs, tasks, workflows
-from nova_core import db
+from nova_api.routers import (
+    admin,
+    apps,
+    audit,
+    catalog,
+    config,
+    documents,
+    exceptions,
+    runs,
+    tasks,
+    workflows,
+)
+from nova_core import db, schedules
 from nova_core.logging import configure_logging
 from nova_core.settings import get_settings
 from nova_core.telemetry import configure_tracing
@@ -24,9 +35,20 @@ configure_logging(settings.log_level)
 tracing = configure_tracing("nova-api", settings.otel_exporter_otlp_endpoint)
 
 
+async def _reconcile_schedules(attempts: int = 30) -> None:
+    for n in range(attempts):  # Temporal may still be coming up
+        try:
+            await schedules.reconcile()
+            return
+        except Exception as e:  # noqa: BLE001 (startup best effort; publish syncs again)
+            if n == attempts - 1:
+                structlog.get_logger().warning("schedules_reconcile_failed", error=str(e))
+            await asyncio.sleep(2)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    tasks = [asyncio.create_task(clauses.index_all())]
+    tasks = [asyncio.create_task(clauses.index_all()), asyncio.create_task(_reconcile_schedules())]
     if settings.llm_key_secret:
         tasks.append(asyncio.create_task(admin.provision_all()))
     yield
@@ -126,7 +148,7 @@ async def me(c: CallerDep) -> dict[str, Any]:
     }
 
 
-routers = (workflows, runs, tasks, config, documents, apps, catalog, audit, admin)
+routers = (workflows, runs, tasks, config, documents, apps, catalog, audit, admin, exceptions)
 for r in (m.router for m in routers):
     v1.include_router(r)
 app.include_router(v1)

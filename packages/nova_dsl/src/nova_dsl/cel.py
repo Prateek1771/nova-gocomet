@@ -81,7 +81,8 @@ def render(value: Any, act: dict[str, Any]) -> Any:
         return [render(v, act) for v in value]
     if not isinstance(value, str):
         return value
-    if (m := TEMPLATE.fullmatch(value.strip())) is not None:
+    # exactly one template: a lazy fullmatch also spans "${{ a }} x ${{ b }}" as one expression
+    if (m := TEMPLATE.fullmatch(value.strip())) is not None and len(TEMPLATE.findall(value)) == 1:
         return evaluate(m[1], act)
     return TEMPLATE.sub(lambda m: _text(evaluate(m[1], act)), value)
 

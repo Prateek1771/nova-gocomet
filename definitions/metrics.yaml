@@ -45,3 +45,9 @@ metrics:
     value: variance_pct
     columns: [run_id, variance_pct, total_usd, ended_at]
     order: ended_at desc
+  shipment_timeline:
+    description: Every milestone of a shipment (gate-in, loaded, departed, arrived, ETA update, discharged).
+    grain: event
+    value: eta
+    columns: [shipment_id, event_time, event_type, location, port_role, vessel, booked_vessel, eta]
+    order: event_time

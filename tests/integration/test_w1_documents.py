@@ -167,7 +167,10 @@ async def test_ten_seed_bols_route_as_specified(w1: dict[str, Any]) -> None:
 
     async with db.tenant_session(w1["tenant"]) as s:
         n_ext = (await s.execute(text("select count(*) from extractions"))).scalar()
-        shipped = set((await s.execute(text("select bol_number from shipments"))).scalars())
+        # the TMS mock's rows only (status 'booked'); the W3 seed's simulated shipments are 'in_transit'
+        shipped = set(
+            (await s.execute(text("select bol_number from shipments where status = 'booked'"))).scalars()
+        )
     assert n_ext == 10
     assert shipped == {case["fields"]["bol_number"] for case in touchless}
 

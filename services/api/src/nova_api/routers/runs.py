@@ -137,7 +137,13 @@ async def start(c: TenantDep, body: StartIn) -> RunOut:
 
 @router.get("")
 async def list_runs(
-    c: TenantDep, status: str | None = None, workflow_key: str | None = None, limit: int = Query(50, le=200)
+    c: TenantDep,
+    status: str | None = None,
+    workflow_key: str | None = None,
+    limit: int = Query(50, le=200),
+    hide_scheduled_ok: bool = Query(
+        False, description="leave out scheduled runs that completed (W3 fires each minute)"
+    ),
 ) -> list[RunOut]:
     await authorize(c, "can_view", f"tenant:{c.tenant_id}")
     async with db.tenant_session(c.tenant_id) as s:
@@ -146,9 +152,10 @@ async def list_runs(
                 _RUN
                 + """ where (cast(:st as text) is null or r.status = :st)
                               and (cast(:k as text) is null or d.key = :k)
+                              and not (:h and r.subject_type = 'schedule' and r.status = 'completed')
                             order by r.started_at desc limit :l"""
             ),
-            {"st": status, "k": workflow_key, "l": limit},
+            {"st": status, "k": workflow_key, "l": limit, "h": hide_scheduled_ok},
         )
         return [RunOut(**_run(r)) for r in rows]
 

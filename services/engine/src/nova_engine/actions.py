@@ -10,7 +10,7 @@ from typing import Any
 import structlog
 from sqlalchemy import text
 
-from nova_core import db
+from nova_core import clickhouse, db
 from nova_core.registry import Registry
 from nova_engine.contracts import ActionRequest
 
@@ -150,3 +150,152 @@ async def carrier_dispute_email(params: dict[str, Any], ctx: ActionRequest) -> d
         "body": body,
         "clause_ids": payload["clause_ids"],
     }
+
+
+@ACTIONS.register("exceptions.detect")
+async def exceptions_detect(params: dict[str, Any], ctx: ActionRequest) -> dict[str, Any]:
+    """W3 detection (docs/04, docs/09 C): each rule is a governed metric + comparison from TenantConfig
+    `exceptions.rules`. Every breaching row becomes one exception per shipment + type (`exceptions_once`, so
+    a breach that lasts several cycles is raised once); the metric's SQL and row are its evidence. The
+    trigger router starts triage from the insert (CDC). Deterministic: no model."""
+    rules = [r for r in params.get("rules") or [] if isinstance(r, dict)]
+    severity = params.get("severity") or {}
+    tenant = uuid.UUID(ctx.tenant_id)
+    found, new = 0, []
+    for r in rules:
+        res = await clickhouse.query_metric(
+            tenant,
+            r["metric"],
+            op=r.get("op", ">"),
+            threshold=float(r["threshold"]),
+            limit=clickhouse.MAX_ROWS,
+        )
+        found += len(res["rows"])
+        async with db.tenant_session(tenant) as s:
+            for row in res["rows"]:
+                facts = {
+                    "metric": r["metric"],
+                    "rule": r,
+                    "sql": res["sql"],
+                    "params": res["params"],
+                    "row": row,
+                }
+                eid = (
+                    await s.execute(
+                        # a breach for a shipment we don't track (no shipments row) is skipped, not an error
+                        text("""insert into exceptions (tenant_id, shipment_id, type, severity, facts)
+                                select :t, id, :ty, :sev, cast(:f as jsonb) from shipments where id = :s
+                                on conflict (tenant_id, shipment_id, type) do nothing returning id"""),
+                        {
+                            "t": ctx.tenant_id,
+                            "s": str(row["shipment_id"]),
+                            "ty": r["type"],
+                            "sev": severity.get(r["type"], "medium"),
+                            "f": json.dumps(facts, default=str),
+                        },
+                    )
+                ).scalar_one_or_none()
+                if eid:
+                    new.append(
+                        {"exception_id": str(eid), "type": r["type"], "shipment_id": str(row["shipment_id"])}
+                    )
+    return {"rules": len(rules), "breaches": found, "new": new}
+
+
+@ACTIONS.register("exceptions.close")
+async def exceptions_close(params: dict[str, Any], ctx: ActionRequest) -> dict[str, Any]:
+    """Resolve an exception with `note: reason` (auto-close, dismiss, or after the customer was told)."""
+    eid = params.get("exception_id")
+    if not eid:
+        raise ValueError("exceptions.close needs exception_id")
+    async with db.tenant_session(uuid.UUID(ctx.tenant_id)) as s:
+        await s.execute(
+            text("""update exceptions set status = 'resolved', resolved_at = coalesce(resolved_at, now()),
+                      note = :n, run_id = coalesce(run_id, cast(:r as uuid))
+                    where id = cast(:e as uuid)"""),
+            {
+                "e": str(eid),
+                "n": ": ".join(str(x) for x in (params.get("note"), params.get("reason")) if x),
+                "r": ctx.run_id,
+            },
+        )
+    return {"exception_id": str(eid), "status": "resolved"}
+
+
+SUBJECT = {"ETA_SLIP": "new arrival time", "DWELL": "delay at transhipment", "MISSED_TS": "missed connection",
+           "ROLLOVER": "booking moved to another vessel"}  # fmt: skip
+
+
+def delay_body(
+    exc: dict[str, Any], sh: dict[str, Any], recs: list[dict[str, Any]], reason: str, message: str = ""
+) -> str:
+    """The customer email (docs/04 W3): what happened, then the message the ops lead approved (the
+    recommender's draft, or their own on override), and the SOPs it follows. Without a message a neutral
+    line stands in: internal ops steps never go to the customer."""
+    row = (exc.get("facts") or {}).get("row") or {}
+    what = {
+        "ETA_SLIP": f"the carrier now expects arrival {row.get('slip_hours', '?')} h later than planned",
+        "DWELL": f"the container has waited {row.get('dwell_hours', '?')} h at {row.get('location')}",
+        "MISSED_TS": f"the container missed its connecting vessel at {row.get('location')}",
+        "ROLLOVER": f"the booking was rolled from {row.get('booked_first')} to {row.get('booked_now')}",
+    }.get(exc["type"], exc["type"])
+    lines = [
+        "Dear customer,",
+        "",
+        f"Shipment {sh.get('bol_number')} (container {sh.get('container_no')}, "
+        f"{sh.get('pol')} -> {sh.get('pod')}): {what}.",
+        "",
+    ]
+    sops = sorted({r["sop_ref"] for r in recs if r.get("sop_ref")})
+    lines += [
+        message or "Our operations team is working with the carrier on the next steps.",
+        "",
+    ] + ([f"Handled under our procedure {', '.join(sops)}."] if sops else [])
+    if reason and not message:
+        lines += ["", f"Note from our operations team: {reason}"]
+    lines += ["", "We will update you as soon as the carrier confirms the new schedule.", "", "Operations"]
+    return "\n".join(lines)
+
+
+@ACTIONS.register("customer.notify")
+async def customer_notify(params: dict[str, Any], ctx: ActionRequest) -> dict[str, Any]:
+    """Queue the customer delay email in the outbox (Debezium -> nova.outbox.shipment -> the notifier's mock
+    sink). The body names the SOP each step follows."""
+    eid = params.get("exception_id")
+    if not eid:
+        raise ValueError("customer.notify needs exception_id")
+    recs = [r for r in params.get("recommendations") or [] if isinstance(r, dict)]
+    # override: the ops lead's own words replace the draft; the SOPs stay cited
+    message = (
+        str(params.get("override_action") or "").strip() or str(params.get("customer_message") or "").strip()
+    )
+    async with db.tenant_session(uuid.UUID(ctx.tenant_id)) as s:
+        exc = (
+            await s.execute(
+                text("""select e.type, e.facts, s.id as shipment_id, s.bol_number, s.container_no,
+                          s.pol, s.pod, s.fields from exceptions e join shipments s on s.id = e.shipment_id
+                        where e.id = cast(:e as uuid)"""),
+                {"e": str(eid)},
+            )
+        ).one()
+        sh = dict(exc._mapping)
+        body = delay_body(
+            {"type": exc.type, "facts": exc.facts}, sh, recs, str(params.get("reason") or ""), message
+        )
+        sop_refs = sorted({r["sop_ref"] for r in recs if r.get("sop_ref")})
+        payload = {
+            "to": (exc.fields or {}).get("consignee_email") or "customer@example.com",
+            "subject": f"Update on shipment {exc.bol_number}: {SUBJECT.get(exc.type, exc.type.lower())}",
+            "body": body,
+            "run_id": ctx.run_id,
+            "refs": {"exception_id": str(eid), "shipment_id": str(exc.shipment_id), "sop_refs": sop_refs},
+        }
+        mid = (
+            await s.execute(
+                text("""insert into outbox (tenant_id, aggregate, aggregate_id, type, payload)
+                        values (:t, 'shipment', :a, 'email.customer_delay', cast(:p as jsonb))
+                        returning id"""),
+                {"t": ctx.tenant_id, "a": str(exc.shipment_id), "p": json.dumps(payload)},
+            )
+        ).scalar_one()
+    return {"message_id": str(mid), "subject": payload["subject"], "body": body, "sop_refs": sop_refs}

@@ -1,0 +1,23 @@
+# W3 · Exception detection (docs/04 W3, docs/09 C). A Temporal Schedule (ADR-036) runs it every minute;
+# each TenantConfig `exceptions.rules` entry is a governed metric (definitions/metrics.yaml) + comparison.
+# A breach inserts one exception per shipment + type; CDC on that insert starts exception_triage.
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: detect_exceptions
+  title: Shipment exception detection
+trigger:
+  type: schedule
+  cron: "* * * * *"  # 1 sim-day = 1 minute in the simulator; docs/04 runs every 5 min in real time
+nodes:
+  - id: detect
+    type: action
+    action: exceptions.detect
+    with:
+      rules: "${{ tenant.exceptions.rules }}"
+      severity: "${{ tenant.exceptions.severity }}"
+    timeout: 60s
+  - id: done
+    type: end
+edges:
+  - {from: detect, to: done}

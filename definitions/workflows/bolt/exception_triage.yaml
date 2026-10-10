@@ -1,0 +1,125 @@
+# W3 · Shipment exception triage (docs/04 W3), Bolt's variant: any high or critical
+# exception goes to a human whatever the decide says, and the ops lead has 30 minutes. Started by the trigger router when
+# exceptions.detect inserts an exception (event exception.opened, CDC). Facts come from governed metrics
+# (exception_analyst), the decision to act from Jev (decide), the next step from the SOPs
+# (action_recommender); only the ops lead's decision notifies the customer (rule 4).
+apiVersion: nova/v1
+kind: Workflow
+metadata:
+  key: exception_triage
+  title: Shipment exception triage
+trigger:
+  type: event
+  event: exception.opened
+inputs:
+  exception_id: {type: string}
+nodes:
+  - id: analyse
+    type: agent
+    agent: exception_analyst
+    with: {exception_id: "${{ input.exception_id }}"}
+    retry: {max_attempts: 3}
+    timeout: 90s
+  - id: triage
+    type: decide
+    questions:
+      - id: actionable
+        ask: "Does this shipment exception need an action from operations?"
+        context: "${{ nodes.analyse.output }}"
+        criteria:
+          "true": >-
+            The facts show a real deviation that changes the delivery plan: ETA slip_hours over the rule's
+            threshold, dwell_hours over 72, a missed connecting vessel, or a booking moved to another vessel.
+          "false": "The facts show no change to the delivery plan (values at or under the thresholds, or no rows)."
+        threshold: 0.5
+      - id: customer_impacting
+        ask: "Will the customer notice this exception (later delivery or extra cost)?"
+        context: "${{ nodes.analyse.output }}"
+        criteria:
+          "true": "The final ETA moves later, or the container waits at a port long enough to risk free time."
+          "false": "Arrival and cost are unchanged."
+        threshold: 0.5
+    timeout: 60s
+  - id: route
+    type: rule
+    cases:
+      - when: "nodes.triage.output.actionable || nodes.analyse.output.severity in ['high', 'critical']"
+        goto: recommend
+    default: auto_close
+  - id: auto_close
+    type: action
+    action: exceptions.close
+    with:
+      exception_id: "${{ input.exception_id }}"
+      note: "Auto-closed, not actionable"
+      reason: "${{ nodes.triage.output.why }}"
+  - id: recommend
+    type: agent
+    agent: action_recommender
+    with:
+      exception_id: "${{ input.exception_id }}"
+      summary: "${{ nodes.analyse.output.summary }}"
+    retry: {max_attempts: 3}
+    timeout: 90s
+  - id: review
+    type: human_task
+    title: "Exception ${{ nodes.analyse.output.type }} · ${{ nodes.analyse.output.shipment.container_no }} (${{ nodes.analyse.output.severity }})"
+    assignee: {role: ops_lead}
+    app: exception_panel
+    sla: 30m
+    escalate: {after: 30m, to: {role: tenant_admin}}
+    outputs: [accept, override, dismiss]
+    with:
+      exception_id: "${{ input.exception_id }}"
+      type: "${{ nodes.analyse.output.type }}"
+      severity: "${{ nodes.analyse.output.severity }}"
+      summary: "${{ nodes.analyse.output.summary }}"
+      shipment: "${{ nodes.analyse.output.shipment }}"
+      facts: "${{ nodes.analyse.output.facts }}"
+      slip_hours: "${{ nodes.analyse.output.slip_hours }}"
+      rule: "${{ nodes.analyse.output.rule }}"
+      recommendations: "${{ nodes.recommend.output.recommendations }}"
+      customer_message: "${{ nodes.recommend.output.customer_message ?? '' }}"
+      customer_impacting: "${{ nodes.triage.output.customer_impacting }}"
+      why: "${{ nodes.triage.output.why }}"
+  - id: notify
+    type: action
+    action: customer.notify
+    with:
+      exception_id: "${{ input.exception_id }}"
+      recommendations: "${{ nodes.recommend.output.recommendations }}"
+      customer_message: "${{ nodes.recommend.output.customer_message ?? '' }}"
+      override_action: "${{ nodes.review.output.payload.action ?? '' }}"
+      reason: "${{ nodes.review.output.payload.reason ?? '' }}"
+  - id: close_notified
+    type: action
+    action: exceptions.close
+    with:
+      exception_id: "${{ input.exception_id }}"
+      note: "Customer notified"
+      reason: "${{ nodes.review.output.decision }}"
+  - id: close_dismissed
+    type: action
+    action: exceptions.close
+    with:
+      exception_id: "${{ input.exception_id }}"
+      note: "Dismissed by ops"
+      reason: "${{ nodes.review.output.payload.reason ?? '' }}"
+  - id: closed
+    type: end
+  - id: notified
+    type: end
+  - id: dismissed
+    type: end
+    status: rejected
+edges:
+  - {from: analyse, to: triage}
+  - {from: triage, to: route}
+  - {from: auto_close, to: closed}
+  - {from: recommend, to: review}
+  - {from: review, to: notify, on: accept}
+  - {from: review, to: notify, on: override}
+  - {from: review, to: close_dismissed, on: dismiss}
+  - {from: notify, to: close_notified}
+  - {from: close_notified, to: notified}
+  - {from: close_dismissed, to: dismissed}

@@ -239,11 +239,11 @@ async def start_subrun(r: SubrunRequest) -> Subrun:
                 r.input,
                 r.version,
                 r.config_version,
-                subject=("run", r.parent_run_id),
+                subject=(r.subject_type, r.parent_run_id),
             )
         except LookupError as e:
             raise ApplicationError(str(e), non_retryable=True) from e
-    return Subrun(str(run.run_id), str(run.definition_id), r.input)
+    return Subrun(str(run.run_id), str(run.definition_id), r.input, run.config_version)
 
 
 ALL.append(start_subrun)

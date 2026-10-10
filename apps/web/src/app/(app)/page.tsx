@@ -9,7 +9,7 @@ export default async function Overview() {
   const me = await getMe();
   if (!me.tenant)
     return <PageHeader title={`Welcome, ${me.name ?? me.email}`} sub="Platform account: tenant screens need an organization login." />;
-  const [runs, tasks] = await Promise.all([apiGet<RunOut[]>("/runs?limit=200"), apiGet<TaskOut[]>("/tasks")]);
+  const [runs, tasks] = await Promise.all([apiGet<RunOut[]>("/runs?limit=200&hide_scheduled_ok=true"), apiGet<TaskOut[]>("/tasks")]);
   const settled = runs.filter((r) => ["completed", "waiting_human", "rejected", "needs_attention"].includes(r.status));
   // a run is touchless when it completed and no human task was ever opened for it
   const reviewed = new Set(tasks.map((t) => t.run_id));

@@ -17,7 +17,7 @@ const FILTERS = [
 export default async function RunsPage(props: PageProps<"/runs">) {
   const sp = await props.searchParams;
   const status = typeof sp.status === "string" ? sp.status : "";
-  const runs = await apiGet<RunOut[]>(`/runs?limit=100${status ? `&status=${encodeURIComponent(status)}` : ""}`);
+  const runs = await apiGet<RunOut[]>(`/runs?limit=100&hide_scheduled_ok=${status ? "false" : "true"}${status ? `&status=${encodeURIComponent(status)}` : ""}`);
   const spend = runs.reduce((a, r) => a + (r.cost_usd ?? 0), 0);
 
   return (

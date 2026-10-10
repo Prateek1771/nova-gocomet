@@ -10,6 +10,7 @@ from nova_core.telemetry import configure_tracing
 from nova_core.temporal import ENGINE_QUEUE, LogContext, client
 from nova_engine import activities
 from nova_engine.interpreter import NovaWorkflow
+from nova_engine.scheduled import ScheduledRun
 
 
 async def main() -> None:
@@ -19,7 +20,7 @@ async def main() -> None:
     worker = Worker(
         await client(),
         task_queue=ENGINE_QUEUE,
-        workflows=[NovaWorkflow],
+        workflows=[NovaWorkflow, ScheduledRun],
         activities=activities.ALL,
         interceptors=[LogContext()],
     )

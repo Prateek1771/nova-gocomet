@@ -510,7 +510,7 @@ Critical E2E journeys:
 
 - [ ] Postgres dump/PITR scripted (`make backup`, `make restore`).
 - [ ] MinIO bucket versioning.
-- [ ] ClickHouse and Weaviate rebuild from Kafka/CDC and `data/sops` (`make rebuild-analytics`, `make reindex`).
+- [ ] ClickHouse and Weaviate rebuild from Kafka/CDC and `definitions/sops` (`make rebuild-analytics`, `make reindex`).
 - [ ] One restore drill: restore → E2E green → RPO/RTO recorded.
 
 ---

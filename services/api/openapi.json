@@ -414,6 +414,98 @@
         "title": "DraftOut",
         "type": "object"
       },
+      "ExceptionOut": {
+        "properties": {
+          "detected_at": {
+            "title": "Detected At",
+            "type": "string"
+          },
+          "facts": {
+            "additionalProperties": true,
+            "title": "Facts",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "shipment": {
+            "additionalProperties": true,
+            "title": "Shipment",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "severity",
+          "status",
+          "detected_at",
+          "resolved_at",
+          "note",
+          "run_id",
+          "shipment",
+          "facts"
+        ],
+        "title": "ExceptionOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -425,6 +517,120 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LagOut": {
+        "properties": {
+          "alerting": {
+            "title": "Alerting",
+            "type": "boolean"
+          },
+          "group_id": {
+            "title": "Group Id",
+            "type": "string"
+          },
+          "lag": {
+            "title": "Lag",
+            "type": "integer"
+          },
+          "measured_at": {
+            "title": "Measured At",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "topic",
+          "lag",
+          "alerting",
+          "measured_at"
+        ],
+        "title": "LagOut",
+        "type": "object"
+      },
+      "MetricOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "description",
+          "sql",
+          "rows"
+        ],
+        "title": "MetricOut",
+        "type": "object"
+      },
+      "NotificationOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "received_at": {
+            "title": "Received At",
+            "type": "string"
+          },
+          "recipient": {
+            "title": "Recipient",
+            "type": "string"
+          },
+          "refs": {
+            "additionalProperties": true,
+            "title": "Refs",
+            "type": "object"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "topic",
+          "type",
+          "recipient",
+          "subject",
+          "body",
+          "refs",
+          "received_at"
+        ],
+        "title": "NotificationOut",
         "type": "object"
       },
       "Published": {
@@ -1255,6 +1461,113 @@
         ]
       }
     },
+    "/api/v1/analytics/metrics": {
+      "get": {
+        "operationId": "list_metrics_api_v1_analytics_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Metrics Api V1 Analytics Metrics Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Metrics",
+        "tags": [
+          "exceptions"
+        ]
+      }
+    },
+    "/api/v1/analytics/metrics/{name}": {
+      "get": {
+        "description": "A governed metric for the caller's tenant (definitions/metrics.yaml; the row policy does the rest).",
+        "operationId": "metric_api_v1_analytics_metrics__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shipment_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shipment Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Metric",
+        "tags": [
+          "exceptions"
+        ]
+      }
+    },
     "/api/v1/apps/{key}": {
       "get": {
         "operationId": "get_app_api_v1_apps__key__get",
@@ -1702,6 +2015,124 @@
         ]
       }
     },
+    "/api/v1/exceptions": {
+      "get": {
+        "operationId": "list_exceptions_api_v1_exceptions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(open|acknowledged|resolved)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExceptionOut"
+                  },
+                  "title": "Response List Exceptions Api V1 Exceptions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Exceptions",
+        "tags": [
+          "exceptions"
+        ]
+      }
+    },
+    "/api/v1/exceptions/{exception_id}": {
+      "get": {
+        "operationId": "get_exception_api_v1_exceptions__exception_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exception_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exception Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Exception",
+        "tags": [
+          "exceptions"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "me_api_v1_me_get",
@@ -1725,6 +2156,91 @@
           }
         ],
         "summary": "Me"
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "description": "The notifier's mock sink: what would have been sent (dispute and customer delay emails).",
+        "operationId": "notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationOut"
+                  },
+                  "title": "Response Notifications Api V1 Notifications Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Notifications",
+        "tags": [
+          "exceptions"
+        ]
+      }
+    },
+    "/api/v1/ops/kafka-lag": {
+      "get": {
+        "description": "Consumer lag per group + topic (ops data, no tenant rows in it).",
+        "operationId": "kafka_lag_api_v1_ops_kafka_lag_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LagOut"
+                  },
+                  "title": "Response Kafka Lag Api V1 Ops Kafka Lag Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Kafka Lag",
+        "tags": [
+          "exceptions"
+        ]
       }
     },
     "/api/v1/runs": {
@@ -1772,6 +2288,18 @@
               "maximum": 200,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "leave out scheduled runs that completed (W3 fires each minute)",
+            "in": "query",
+            "name": "hide_scheduled_ok",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "leave out scheduled runs that completed (W3 fires each minute)",
+              "title": "Hide Scheduled Ok",
+              "type": "boolean"
             }
           }
         ],
